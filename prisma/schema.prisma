@@ -1,0 +1,67 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Client {
+  id                     Int      @id @default(autoincrement())
+  business_name          String
+  whatsapp_instance_id   String   @unique
+  password_hash          String
+  is_active              Boolean  @default(true)
+  system_prompt_template String   @db.Text
+  tools_config           Json?    @default("{}")
+  created_at             DateTime @default(now())
+
+  // Relations
+  customers    Customer[]
+  appointments Appointment[]
+
+  @@map("clients")
+}
+
+model Customer {
+  id           Int      @id @default(autoincrement())
+  client_id    Int
+  phone_number String
+  full_name    String?
+  data         Json?    @default("{}")
+  created_at   DateTime @default(now())
+
+  // Relations
+  client       Client        @relation(fields: [client_id], references: [id])
+  appointments Appointment[]
+
+  @@index([client_id])
+  @@index([phone_number])
+  @@map("customers")
+}
+
+model Appointment {
+  id              Int      @id @default(autoincrement())
+  client_id       Int
+  customer_id     Int
+  google_event_id String?  @unique
+  start_time      DateTime
+  end_time        DateTime
+  status          String   @default("CONFIRMED")
+  notes           String?  @db.Text
+
+  // Relations
+  client   Client   @relation(fields: [client_id], references: [id])
+  customer Customer @relation(fields: [customer_id], references: [id])
+
+  @@index([client_id])
+  @@index([customer_id])
+  @@map("appointments")
+}
