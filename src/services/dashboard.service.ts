@@ -150,10 +150,10 @@ export const getAppointmentStatusData = async (clientId?: number): Promise<Appoi
         })
 
         return [
-            { status: "Confirmadas", count: statusCounts.CONFIRMED, color: "#22c55e" },
-            { status: "Completadas", count: statusCounts.COMPLETED, color: "#3b82f6" },
-            { status: "Canceladas", count: statusCounts.CANCELLED, color: "#ef4444" },
-            { status: "No Asistieron", count: statusCounts.NO_SHOW, color: "#f59e0b" },
+            { status: "Confirmadas", count: statusCounts.CONFIRMED, fill: "#22c55e" },
+            { status: "Completadas", count: statusCounts.COMPLETED, fill: "#3b82f6" },
+            { status: "Canceladas", count: statusCounts.CANCELLED, fill: "#ef4444" },
+            { status: "No Asistió", count: statusCounts.NO_SHOW, fill: "#f59e0b" },
         ]
     } catch (error) {
         console.error("Error fetching appointment status:", error)

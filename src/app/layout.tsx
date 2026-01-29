@@ -3,6 +3,7 @@ import type { Metadata, Viewport } from "next"
 import { Inter } from "next/font/google"
 import { Analytics } from "@vercel/analytics/next"
 import { AuthProvider } from "@/lib/auth-context"
+import { AdminAuthProvider } from "@/lib/admin-auth-context"
 import { Toaster } from "@/components/ui/sonner"
 import "./globals.css"
 
@@ -45,8 +46,10 @@ export default function RootLayout({
     <html lang="es">
       <body className="font-sans antialiased">
         <AuthProvider>
-          {children}
-          <Toaster />
+          <AdminAuthProvider>
+            {children}
+            <Toaster />
+          </AdminAuthProvider>
         </AuthProvider>
         <Analytics />
       </body>

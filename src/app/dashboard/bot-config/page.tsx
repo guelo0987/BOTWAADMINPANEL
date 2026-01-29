@@ -71,8 +71,7 @@ export default function BotConfigPage() {
         if (typeof toolsConfig === 'string') {
           try {
             toolsConfig = JSON.parse(toolsConfig)
-          } catch (e) {
-            console.error("Error parsing tools_config:", e)
+          } catch {
             toolsConfig = {}
           }
         }
@@ -99,7 +98,11 @@ export default function BotConfigPage() {
             // Campos específicos por tipo - preservar arrays existentes
             services: Array.isArray(toolsConfig.services) ? toolsConfig.services : [],
             professionals: Array.isArray(toolsConfig.professionals) ? toolsConfig.professionals : [],
-            areas: Array.isArray(toolsConfig.areas) ? toolsConfig.areas : [],
+            areas: Array.isArray(toolsConfig.areas)
+              ? toolsConfig.areas.map((a: unknown) =>
+                  typeof a === "string" ? a : (a as { name?: string })?.name ?? ""
+                )
+              : [],
             occasions: Array.isArray(toolsConfig.occasions) ? toolsConfig.occasions : [],
             catalog: toolsConfig.catalog || { categories: [] },
             // Campos opcionales - usar valores existentes o undefined
@@ -110,19 +113,13 @@ export default function BotConfigPage() {
             delivery_available: toolsConfig.delivery_available ?? false,
             delivery_fee: toolsConfig.delivery_fee,
             free_delivery_minimum: toolsConfig.free_delivery_minimum,
+            slot_duration: toolsConfig.slot_duration,
+            delivery_hours: toolsConfig.delivery_hours,
+            delivery_duration: toolsConfig.delivery_duration,
           },
         }
-        
-        console.log("Loaded config:", normalizedConfig)
-        console.log("Services:", normalizedConfig.tools_config.services)
-        console.log("Services type:", typeof normalizedConfig.tools_config.services)
-        console.log("Services is array:", Array.isArray(normalizedConfig.tools_config.services))
-        console.log("Services length:", normalizedConfig.tools_config.services?.length)
-        console.log("Business type:", normalizedConfig.tools_config.business_type)
-        
         setConfig(normalizedConfig)
       } catch (error) {
-        console.error("Error loading config:", error)
         toast({
           title: "Error",
           description: "No se pudo cargar la configuración",
@@ -186,11 +183,10 @@ export default function BotConfigPage() {
         title: "Éxito",
         description: "Configuración guardada correctamente",
       })
-    } catch (error: any) {
-      console.error("Error saving config:", error)
+    } catch (error: unknown) {
       toast({
         title: "Error",
-        description: error.message || "No se pudo guardar la configuración",
+        description: error instanceof Error ? error.message : "No se pudo guardar la configuración",
         variant: "destructive",
       })
     } finally {
@@ -290,7 +286,7 @@ export default function BotConfigPage() {
       </Card>
 
       <Tabs defaultValue="business" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className={`grid w-full ${(config.tools_config.business_type === "clinic" || config.tools_config.business_type === "salon") ? "grid-cols-4" : "grid-cols-3"}`}>
           <TabsTrigger value="business">
             <Building2 className="h-4 w-4 mr-2" />
             Negocio
@@ -303,10 +299,12 @@ export default function BotConfigPage() {
             <DollarSign className="h-4 w-4 mr-2" />
             Servicios
           </TabsTrigger>
-          <TabsTrigger value="team">
-            <Users className="h-4 w-4 mr-2" />
-            Equipo
-          </TabsTrigger>
+          {(config.tools_config.business_type === "clinic" || config.tools_config.business_type === "salon") && (
+            <TabsTrigger value="team">
+              <Users className="h-4 w-4 mr-2" />
+              Equipo
+            </TabsTrigger>
+          )}
         </TabsList>
 
         {/* Business Tab */}
@@ -515,6 +513,31 @@ export default function BotConfigPage() {
                     })}
                   </div>
                 </div>
+
+                {/* Duración de slot (salon) - minutos por cita */}
+                {config.tools_config.business_type === "salon" && (
+                  <div className="space-y-2">
+                    <Label>Duración de slot (minutos)</Label>
+                    <Input
+                      type="number"
+                      min={5}
+                      value={config.tools_config.slot_duration ?? 30}
+                      onChange={(e) =>
+                        setConfig({
+                          ...config,
+                          tools_config: {
+                            ...config.tools_config,
+                            slot_duration: Number(e.target.value) || undefined,
+                          },
+                        })
+                      }
+                      placeholder="30"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Duración por defecto de cada slot de cita (ej: 30 min)
+                    </p>
+                  </div>
+                )}
               </div>
 
               <Separator />
@@ -816,64 +839,44 @@ export default function BotConfigPage() {
             </Card>
           )}
 
-          {/* Areas para restaurant */}
+          {/* Areas para restaurant (nombres: Terraza, Salón principal, VIP) */}
           {config.tools_config.business_type === "restaurant" && (
             <>
               <Card>
                 <CardHeader>
                   <CardTitle>Áreas del Restaurante</CardTitle>
                   <CardDescription>
-                    Configura las áreas disponibles para reservas
+                    Nombres de áreas disponibles para reservas (ej: Terraza, Salón principal, VIP)
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  {config.tools_config.areas?.map((area, index) => (
+                  {(config.tools_config.areas || []).map((areaName, index) => (
                     <div
                       key={index}
                       className="flex items-center gap-4 p-4 rounded-lg border border-border"
                     >
-                      <div className="flex-1 grid gap-4 md:grid-cols-2">
-                        <Input
-                          placeholder="Nombre del área"
-                          value={area.name}
-                          onChange={(e) => {
-                            const newAreas = [...(config.tools_config.areas || [])]
-                            newAreas[index] = { ...area, name: e.target.value }
-                            setConfig({
-                              ...config,
-                              tools_config: {
-                                ...config.tools_config,
-                                areas: newAreas,
-                              },
-                            })
-                          }}
-                        />
-                        <Input
-                          type="number"
-                          placeholder="Capacidad"
-                          value={area.capacity}
-                          onChange={(e) => {
-                            const newAreas = [...(config.tools_config.areas || [])]
-                            newAreas[index] = {
-                              ...area,
-                              capacity: Number(e.target.value),
-                            }
-                            setConfig({
-                              ...config,
-                              tools_config: {
-                                ...config.tools_config,
-                                areas: newAreas,
-                              },
-                            })
-                          }}
-                        />
-                      </div>
+                      <Input
+                        className="flex-1"
+                        placeholder="Nombre del área (ej: Terraza)"
+                        value={typeof areaName === "string" ? areaName : ""}
+                        onChange={(e) => {
+                          const newAreas = [...(config.tools_config.areas || [])]
+                          newAreas[index] = e.target.value
+                          setConfig({
+                            ...config,
+                            tools_config: {
+                              ...config.tools_config,
+                              areas: newAreas,
+                            },
+                          })
+                        }}
+                      />
                       <Button
                         variant="ghost"
                         size="icon"
                         className="text-destructive hover:text-destructive"
                         onClick={() => {
-                          const newAreas = config.tools_config.areas?.filter(
+                          const newAreas = (config.tools_config.areas || []).filter(
                             (_, i) => i !== index
                           )
                           setConfig({
@@ -893,10 +896,7 @@ export default function BotConfigPage() {
                     variant="outline"
                     className="w-full bg-transparent"
                     onClick={() => {
-                      const newAreas = [
-                        ...(config.tools_config.areas || []),
-                        { name: "", capacity: 0 },
-                      ]
+                      const newAreas = [...(config.tools_config.areas || []), ""]
                       setConfig({
                         ...config,
                         tools_config: {
@@ -1234,40 +1234,99 @@ export default function BotConfigPage() {
                     />
                   </div>
                   {config.tools_config.delivery_available && (
-                    <div className="grid gap-4 md:grid-cols-2">
+                    <>
+                      <div className="grid gap-4 md:grid-cols-2">
+                        <div className="space-y-2">
+                          <Label>Costo de Entrega</Label>
+                          <Input
+                            type="number"
+                            value={config.tools_config.delivery_fee || 0}
+                            onChange={(e) =>
+                              setConfig({
+                                ...config,
+                                tools_config: {
+                                  ...config.tools_config,
+                                  delivery_fee: Number(e.target.value),
+                                },
+                              })
+                            }
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Mínimo para Entrega Gratis</Label>
+                          <Input
+                            type="number"
+                            value={config.tools_config.free_delivery_minimum || 0}
+                            onChange={(e) =>
+                              setConfig({
+                                ...config,
+                                tools_config: {
+                                  ...config.tools_config,
+                                  free_delivery_minimum: Number(e.target.value),
+                                },
+                              })
+                            }
+                          />
+                        </div>
+                      </div>
+                      <div className="grid gap-4 md:grid-cols-2">
+                        <div className="space-y-2">
+                          <Label>Horario de entregas (inicio)</Label>
+                          <Input
+                            type="time"
+                            value={config.tools_config.delivery_hours?.start || "09:00"}
+                            onChange={(e) =>
+                              setConfig({
+                                ...config,
+                                tools_config: {
+                                  ...config.tools_config,
+                                  delivery_hours: {
+                                    start: e.target.value,
+                                    end: config.tools_config.delivery_hours?.end || "18:00",
+                                  },
+                                },
+                              })
+                            }
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Horario de entregas (fin)</Label>
+                          <Input
+                            type="time"
+                            value={config.tools_config.delivery_hours?.end || "18:00"}
+                            onChange={(e) =>
+                              setConfig({
+                                ...config,
+                                tools_config: {
+                                  ...config.tools_config,
+                                  delivery_hours: {
+                                    start: config.tools_config.delivery_hours?.start || "09:00",
+                                    end: e.target.value,
+                                  },
+                                },
+                              })
+                            }
+                          />
+                        </div>
+                      </div>
                       <div className="space-y-2">
-                        <Label>Costo de Entrega</Label>
+                        <Label>Duración estimada de entrega (minutos)</Label>
                         <Input
                           type="number"
-                          value={config.tools_config.delivery_fee || 0}
+                          min={1}
+                          value={config.tools_config.delivery_duration ?? 60}
                           onChange={(e) =>
                             setConfig({
                               ...config,
                               tools_config: {
                                 ...config.tools_config,
-                                delivery_fee: Number(e.target.value),
+                                delivery_duration: Number(e.target.value) || undefined,
                               },
                             })
                           }
                         />
                       </div>
-                      <div className="space-y-2">
-                        <Label>Mínimo para Entrega Gratis</Label>
-                        <Input
-                          type="number"
-                          value={config.tools_config.free_delivery_minimum || 0}
-                          onChange={(e) =>
-                            setConfig({
-                              ...config,
-                              tools_config: {
-                                ...config.tools_config,
-                                free_delivery_minimum: Number(e.target.value),
-                              },
-                            })
-                          }
-                        />
-                      </div>
-                    </div>
+                    </>
                   )}
                 </CardContent>
               </Card>
@@ -1342,9 +1401,10 @@ export default function BotConfigPage() {
                               })
                             }}
                           />
-                          {config.tools_config.business_type === "clinic" && (
+                          {(config.tools_config.business_type === "clinic" ||
+                            config.tools_config.business_type === "salon") && (
                             <Input
-                              placeholder="Calendar ID"
+                              placeholder="Calendar ID (opcional)"
                               value={professional.calendar_id || ""}
                               onChange={(e) => {
                                 const newProfessionals = [
@@ -1365,6 +1425,92 @@ export default function BotConfigPage() {
                             />
                           )}
                         </div>
+
+                        {/* Para salón: Duración de slot y horarios (opcionales) */}
+                        {config.tools_config.business_type === "salon" && (
+                          <>
+                            <div className="grid gap-4 md:grid-cols-2">
+                              <div className="space-y-2">
+                                <Label className="text-xs">Duración del slot (min)</Label>
+                                <Input
+                                  type="number"
+                                  placeholder="60"
+                                  value={professional.slot_duration || ""}
+                                  onChange={(e) => {
+                                    const newProfessionals = [
+                                      ...(config.tools_config.professionals || []),
+                                    ]
+                                    newProfessionals[index] = {
+                                      ...professional,
+                                      slot_duration: Number(e.target.value) || undefined,
+                                    }
+                                    setConfig({
+                                      ...config,
+                                      tools_config: {
+                                        ...config.tools_config,
+                                        professionals: newProfessionals,
+                                      },
+                                    })
+                                  }}
+                                />
+                              </div>
+                            </div>
+                            <div className="grid gap-4 md:grid-cols-2">
+                              <div className="space-y-2">
+                                <Label className="text-xs">Hora de Inicio</Label>
+                                <Input
+                                  type="time"
+                                  value={professional.business_hours?.start || ""}
+                                  onChange={(e) => {
+                                    const newProfessionals = [
+                                      ...(config.tools_config.professionals || []),
+                                    ]
+                                    newProfessionals[index] = {
+                                      ...professional,
+                                      business_hours: {
+                                        start: e.target.value,
+                                        end: professional.business_hours?.end || "18:00",
+                                      },
+                                    }
+                                    setConfig({
+                                      ...config,
+                                      tools_config: {
+                                        ...config.tools_config,
+                                        professionals: newProfessionals,
+                                      },
+                                    })
+                                  }}
+                                />
+                              </div>
+                              <div className="space-y-2">
+                                <Label className="text-xs">Hora de Fin</Label>
+                                <Input
+                                  type="time"
+                                  value={professional.business_hours?.end || ""}
+                                  onChange={(e) => {
+                                    const newProfessionals = [
+                                      ...(config.tools_config.professionals || []),
+                                    ]
+                                    newProfessionals[index] = {
+                                      ...professional,
+                                      business_hours: {
+                                        start: professional.business_hours?.start || "08:00",
+                                        end: e.target.value,
+                                      },
+                                    }
+                                    setConfig({
+                                      ...config,
+                                      tools_config: {
+                                        ...config.tools_config,
+                                        professionals: newProfessionals,
+                                      },
+                                    })
+                                  }}
+                                />
+                              </div>
+                            </div>
+                          </>
+                        )}
 
                         {/* Segunda fila: Para clínicas - Precio, Duración, Horarios */}
                         {config.tools_config.business_type === "clinic" && (
@@ -1547,13 +1693,13 @@ export default function BotConfigPage() {
                 variant="outline"
                 className="w-full bg-transparent"
                 onClick={() => {
-                  const baseProfessional: any = {
+                  type Prof = NonNullable<Client["tools_config"]["professionals"]>[number]
+                  const baseProfessional: Prof = {
                     id: `prof_${Date.now()}`,
                     name: "",
                     specialty: "",
                   }
 
-                  // Para clínicas, agregar campos adicionales
                   if (config.tools_config.business_type === "clinic") {
                     baseProfessional.calendar_id = ""
                     baseProfessional.consultation_price = undefined
@@ -1564,8 +1710,15 @@ export default function BotConfigPage() {
                       end: "18:00",
                     }
                   }
+                  if (config.tools_config.business_type === "salon") {
+                    baseProfessional.slot_duration = 60
+                    baseProfessional.business_hours = {
+                      start: "08:00",
+                      end: "17:00",
+                    }
+                  }
 
-                  const newProfessionals = [
+                  const newProfessionals: Prof[] = [
                     ...(config.tools_config.professionals || []),
                     baseProfessional,
                   ]

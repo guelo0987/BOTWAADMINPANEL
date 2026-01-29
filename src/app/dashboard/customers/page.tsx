@@ -330,10 +330,12 @@ function CustomerDetail({
                               : "Escalada"}
                         </Badge>
                         <span className="text-xs text-muted-foreground">
-                          {formatDistanceToNow(new Date(conv.last_message_at), {
-                            addSuffix: true,
-                            locale: es,
-                          })}
+                          {conv.last_message_at
+                            ? formatDistanceToNow(new Date(conv.last_message_at), {
+                                addSuffix: true,
+                                locale: es,
+                              })
+                            : "Sin mensajes"}
                         </span>
                       </div>
                       <p className="text-sm text-muted-foreground truncate">

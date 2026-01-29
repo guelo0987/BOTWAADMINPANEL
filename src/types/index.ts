@@ -18,6 +18,8 @@ export interface ToolsConfig {
     end: string
   }
   working_days?: number[]
+  /** Duración de slots en minutos (salon). */
+  slot_duration?: number
   services?: Array<{
     name: string
     price: number
@@ -46,10 +48,8 @@ export interface ToolsConfig {
       }>
     }>
   }
-  areas?: Array<{
-    name: string
-    capacity: number
-  }>
+  /** Áreas del restaurante: nombres (ej. Terraza, Salón principal, VIP). */
+  areas?: string[]
   occasions?: string[]
   menu_url?: string
   calendar_id?: string
@@ -59,6 +59,10 @@ export interface ToolsConfig {
   delivery_available?: boolean
   delivery_fee?: number
   free_delivery_minimum?: number
+  /** Horario de entregas (store). */
+  delivery_hours?: { start: string; end: string }
+  /** Duración estimada de entrega en minutos (store). */
+  delivery_duration?: number
 }
 
 export interface Customer {

@@ -257,12 +257,14 @@ export function RecentConversations({ conversations }: { conversations: Conversa
         active: "bg-green-500/10 text-green-600 border-green-500/20",
         resolved: "bg-muted text-muted-foreground border-border",
         escalated: "bg-destructive/10 text-destructive border-destructive/20",
+        human_handled: "bg-primary/10 text-primary border-primary/20",
     }
 
     const statusLabels = {
         active: "Activa",
         resolved: "Resuelta",
         escalated: "Escalada",
+        human_handled: "Atendida",
     }
 
     return (

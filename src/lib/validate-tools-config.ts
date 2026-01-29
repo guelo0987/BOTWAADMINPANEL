@@ -61,17 +61,32 @@ export function validateToolsConfig(config: ToolsConfig): ValidationError[] {
         if (!config.services || config.services.length === 0) {
             errors.push({
                 field: "services",
-                message: "Los salones deben tener al menos un servicio",
+                message: "Los salones deben tener al menos un servicio (con nombre, precio y duration_minutes)",
+            })
+        }
+        if (config.slot_duration != null && (typeof config.slot_duration !== "number" || config.slot_duration <= 0)) {
+            errors.push({
+                field: "slot_duration",
+                message: "slot_duration debe ser un número positivo (minutos)",
             })
         }
     }
 
     if (config.business_type === "restaurant") {
-        if (!config.areas || config.areas.length === 0) {
+        const areas = config.areas
+        if (!Array.isArray(areas) || areas.length === 0) {
             errors.push({
                 field: "areas",
-                message: "Los restaurantes deben tener al menos un área",
+                message: "Los restaurantes deben tener al menos un área (ej: Terraza, Salón principal)",
             })
+        } else {
+            const invalid = areas.some((a) => typeof a !== "string" || !String(a).trim())
+            if (invalid) {
+                errors.push({
+                    field: "areas",
+                    message: "Cada área debe ser un nombre de texto (ej: Terraza, VIP)",
+                })
+            }
         }
     }
 
@@ -80,6 +95,29 @@ export function validateToolsConfig(config: ToolsConfig): ValidationError[] {
             errors.push({
                 field: "catalog",
                 message: "Las tiendas deben tener al menos una categoría en el catálogo",
+            })
+        }
+        if (config.delivery_hours) {
+            const dh = config.delivery_hours
+            if (!dh.start || !dh.end) {
+                errors.push({
+                    field: "delivery_hours",
+                    message: "delivery_hours debe tener start y end (ej: 09:00 - 18:00)",
+                })
+            } else {
+                const timeRegex = /^([0-1][0-9]|2[0-3]):[0-5][0-9]$/
+                if (!timeRegex.test(dh.start) || !timeRegex.test(dh.end)) {
+                    errors.push({
+                        field: "delivery_hours",
+                        message: "Horarios en formato HH:MM (ej: 09:00)",
+                    })
+                }
+            }
+        }
+        if (config.delivery_duration != null && (typeof config.delivery_duration !== "number" || config.delivery_duration <= 0)) {
+            errors.push({
+                field: "delivery_duration",
+                message: "delivery_duration debe ser un número positivo (minutos)",
             })
         }
     }

@@ -13,6 +13,24 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// Matches existing Postgres enum: CREATE TYPE roles AS ENUM ('admin', 'empleado');
+enum roles {
+  admin
+  empleado
+}
+
+// Matches existing table: public.users
+model User {
+  id         Int    @id
+  username   String @db.VarChar(20) @map("user")
+  password   String @db.VarChar(220)
+  created_at DateTime? @default(now()) @db.Date
+  updated_at DateTime? @default(now()) @db.Date
+  rol        roles?
+
+  @@map("users")
+}
+
 model Client {
   id                     Int      @id @default(autoincrement())
   business_name          String
