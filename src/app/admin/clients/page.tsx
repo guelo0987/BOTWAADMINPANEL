@@ -49,12 +49,12 @@ type ClientRow = {
 
 type BusinessType = NonNullable<ToolsConfig["business_type"]>
 
-const BUSINESS_TYPES: Array<{ value: BusinessType; label: string }> = [
-  { value: "general", label: "General" },
-  { value: "clinic", label: "Clínica" },
-  { value: "salon", label: "Salón" },
-  { value: "restaurant", label: "Restaurante" },
-  { value: "store", label: "Tienda" },
+const BUSINESS_TYPES: Array<{ value: BusinessType; label: string; description: string }> = [
+  { value: "general", label: "General", description: "Citas básicas (fecha, hora, nombre, correo). Sin catálogo ni profesionales." },
+  { value: "salon", label: "Servicios + Citas", description: "Detailing, taller, spa, centro de servicios: lista de servicios con precio/duración y citas. Profesionales opcionales." },
+  { value: "store", label: "Tienda / Catálogo", description: "Dealer, concesionario, tienda. Catálogo de productos. Visita sin cita; calendar_id solo si hay entregas a domicilio." },
+  { value: "clinic", label: "Clínica / Consultorio", description: "Citas con doctor. Si hay varios profesionales, el cliente debe elegir con quién agendar." },
+  { value: "restaurant", label: "Restaurante", description: "Reservas de mesas: fecha, hora, personas, área. Menú opcional (menu_url)." },
 ]
 
 export default function AdminClientsPage() {
@@ -81,10 +81,7 @@ export default function AdminClientsPage() {
   const [newPassword, setNewPassword] = useState("")
   const [isResetting, setIsResetting] = useState(false)
 
-  const businessTypeLabel = useMemo(() => {
-    const found = BUSINESS_TYPES.find((t) => t.value === businessType)
-    return found?.label || "General"
-  }, [businessType])
+  const businessTypeLabel = BUSINESS_TYPES.find((t) => t.value === businessType)?.label ?? "General"
 
   const fetchClients = async () => {
     const res = await fetch("/api/admin/clients", { method: "GET" })
@@ -251,7 +248,7 @@ export default function AdminClientsPage() {
               <DialogHeader>
                 <DialogTitle>Crear cliente</DialogTitle>
                 <DialogDescription>
-                  Crea un cliente y configura el tipo de empresa (se guarda en <code>tools_config.business_type</code>).
+                  El tipo de negocio define si hay citas, catálogo, profesionales, etc. El cliente podrá afinar la configuración en su panel (Configuración del Bot).
                 </DialogDescription>
               </DialogHeader>
 
@@ -270,7 +267,9 @@ export default function AdminClientsPage() {
                       ))}
                     </SelectContent>
                   </Select>
-                  <p className="text-xs text-muted-foreground">Seleccionado: {businessTypeLabel}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {BUSINESS_TYPES.find((t) => t.value === businessType)?.description}
+                  </p>
                 </div>
 
                 <div className="grid gap-2">

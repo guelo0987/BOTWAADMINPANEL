@@ -18,7 +18,7 @@ function defaultToolsConfigForType(business_type: ToolsConfig["business_type"]):
     return {
       ...base,
       services: [{ name: "Consulta general", price: 0, duration_minutes: 30 }],
-      professionals: [{ id: "prof-1", name: "Profesional 1" }],
+      professionals: [{ id: "prof-1", name: "Dr./Dra. 1", specialty: "" }],
       requires_insurance: false,
     }
   }
@@ -27,7 +27,7 @@ function defaultToolsConfigForType(business_type: ToolsConfig["business_type"]):
     return {
       ...base,
       slot_duration: 30,
-      services: [{ name: "Corte de pelo", price: 0, duration_minutes: 60 }],
+      services: [{ name: "Servicio", price: 0, duration_minutes: 60 }],
       professionals: [],
     }
   }
@@ -36,7 +36,7 @@ function defaultToolsConfigForType(business_type: ToolsConfig["business_type"]):
     return {
       ...base,
       business_hours: { start: "12:00", end: "23:00" },
-      working_days: [1, 2, 3, 4, 5, 6],
+      working_days: [1, 2, 3, 4, 5, 6, 7],
       areas: ["Salón principal", "Terraza"],
       occasions: ["Cumpleaños", "Aniversario", "Reunión de negocios"],
     }
@@ -45,11 +45,11 @@ function defaultToolsConfigForType(business_type: ToolsConfig["business_type"]):
   if (business_type === "store") {
     return {
       ...base,
-      calendar_id: undefined,
       catalog: { categories: [{ name: "General", products: [{ name: "Producto", price: 0 }] }] },
+      delivery_available: false,
       delivery_hours: { start: "09:00", end: "18:00" },
       delivery_duration: 60,
-      free_delivery_minimum: 3000,
+      free_delivery_minimum: undefined,
     }
   }
 
@@ -59,16 +59,16 @@ function defaultToolsConfigForType(business_type: ToolsConfig["business_type"]):
 function defaultPromptForType(business_type: ToolsConfig["business_type"]): string {
   switch (business_type) {
     case "clinic":
-      return "Eres un asistente amable de una clínica. Ayudas a agendar, reprogramar o cancelar citas, responder preguntas frecuentes y recopilar datos del paciente de forma respetuosa."
+      return "Eres el asistente de [Nombre del Negocio]. Ayudas a agendar, reprogramar o cancelar citas con los doctores, responder preguntas frecuentes y recopilar datos del paciente de forma respetuosa. No des consejos médicos ni diagnósticos."
     case "salon":
-      return "Eres un asistente amable de un salón. Ayudas a reservar servicios, consultar disponibilidad y precios, y confirmar citas."
+      return "Eres el asistente de [Nombre del Negocio]. Hablas de servicios (lavado, pulido, sesiones, etc.). Ayudas a reservar servicios, consultar disponibilidad y precios, y confirmar citas. Sé breve y profesional."
     case "restaurant":
-      return "Eres un asistente amable de un restaurante. Ayudas con reservas, horarios, menú y consultas de disponibilidad."
+      return "Eres el asistente de [Nombre del Restaurante]. Ayudas con reservas de mesas, horarios, menú y consultas de disponibilidad. Tono cordial y elegante."
     case "store":
-      return "Eres un asistente amable de una tienda. Ayudas con el catálogo de productos, disponibilidad y precios. Al agendar entregas a domicilio, siempre mencionas que el pago es contra entrega."
+      return "Eres el asistente de [Nombre del Negocio]. Hablas de productos, modelos y precios. Si el cliente dice que va a pasar a ver, confirma horarios y dile que puede pasar cuando quiera. No obligues a agendar cita para solo ver el catálogo. En entregas a domicilio, el pago es contra entrega."
     case "general":
     default:
-      return "Eres un asistente amable."
+      return "Eres el asistente de [Nombre del Negocio]. Ayudas a agendar citas (nombre, correo, fecha y hora). Sé amable y conciso."
   }
 }
 

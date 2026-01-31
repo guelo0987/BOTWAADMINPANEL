@@ -203,11 +203,11 @@ export default function BotConfigPage() {
   }
 
   const businessTypes = [
+    { value: "general", label: "General" },
+    { value: "salon", label: "Servicios + Citas (detailing, taller, spa…)" },
+    { value: "store", label: "Tienda / Catálogo (sin citas obligatorias)" },
     { value: "clinic", label: "Clínica / Consultorio" },
-    { value: "salon", label: "Salón de Belleza" },
     { value: "restaurant", label: "Restaurante" },
-    { value: "store", label: "Tienda" },
-    { value: "general", label: "Negocio General" },
   ]
 
   const timezones = [
@@ -217,14 +217,15 @@ export default function BotConfigPage() {
     { value: "America/Bogota", label: "Bogotá (COT)" },
   ]
 
+  // 1 = Lunes, 7 = Domingo (según README bot)
   const weekdays = [
-    { value: 0, label: "Domingo" },
     { value: 1, label: "Lunes" },
     { value: 2, label: "Martes" },
     { value: 3, label: "Miércoles" },
     { value: 4, label: "Jueves" },
     { value: 5, label: "Viernes" },
     { value: 6, label: "Sábado" },
+    { value: 7, label: "Domingo" },
   ]
 
   return (
@@ -667,31 +668,15 @@ export default function BotConfigPage() {
 
         {/* Services Tab */}
         <TabsContent value="services" className="space-y-4">
-          {/* Para clínicas: los servicios están en los profesionales */}
-          {config.tools_config.business_type === "clinic" && (
+          {/* Servicios para salon y clinic (opcional en clinic; ver README) */}
+          {(config.tools_config.business_type === "salon" || config.tools_config.business_type === "clinic") && (
             <Card>
               <CardHeader>
-                <CardTitle>Servicios y Precios</CardTitle>
+                <CardTitle>Servicios disponibles</CardTitle>
                 <CardDescription>
-                  Para clínicas, los servicios y precios se configuran en cada profesional
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="text-center py-8 text-muted-foreground">
-                  <p className="mb-2">Los servicios están configurados en la pestaña "Equipo"</p>
-                  <p className="text-sm">Cada profesional tiene su propio precio de consulta, duración y horarios</p>
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Services para salon (no clínicas) */}
-          {config.tools_config.business_type === "salon" && (
-            <Card>
-              <CardHeader>
-                <CardTitle>Servicios y Precios</CardTitle>
-                <CardDescription>
-                  Configura los servicios que ofrece tu negocio
+                  {config.tools_config.business_type === "salon"
+                    ? "Lista de servicios con precio y duración (el bot los muestra al cliente)."
+                    : "Servicios/consultas opcionales; el bot los muestra y usa para calcular slots."}
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -1069,7 +1054,7 @@ export default function BotConfigPage() {
                           {category.products?.map((product, prodIndex) => (
                             <div
                               key={prodIndex}
-                              className="flex items-center gap-2"
+                              className="flex flex-wrap items-center gap-2"
                             >
                               <Input
                                 placeholder="Nombre del producto"
@@ -1093,6 +1078,7 @@ export default function BotConfigPage() {
                                     },
                                   })
                                 }}
+                                className="min-w-[140px]"
                               />
                               <Input
                                 type="number"
@@ -1120,7 +1106,34 @@ export default function BotConfigPage() {
                                     },
                                   })
                                 }}
-                                className="w-32"
+                                className="w-28"
+                              />
+                              <Input
+                                placeholder="Descripción (opcional)"
+                                value={product.description ?? ""}
+                                onChange={(e) => {
+                                  const newCatalog = {
+                                    ...config.tools_config.catalog,
+                                    categories: [
+                                      ...(config.tools_config.catalog?.categories ||
+                                        []),
+                                    ],
+                                  }
+                                  newCatalog.categories[catIndex].products[
+                                    prodIndex
+                                  ] = {
+                                    ...product,
+                                    description: e.target.value || undefined,
+                                  }
+                                  setConfig({
+                                    ...config,
+                                    tools_config: {
+                                      ...config.tools_config,
+                                      catalog: newCatalog,
+                                    },
+                                  })
+                                }}
+                                className="min-w-[180px] flex-1 max-w-xs"
                               />
                               <Button
                                 variant="ghost"
@@ -1168,6 +1181,7 @@ export default function BotConfigPage() {
                               newCatalog.categories[catIndex].products.push({
                                 name: "",
                                 price: 0,
+                                description: undefined,
                               })
                               setConfig({
                                 ...config,
@@ -1214,7 +1228,7 @@ export default function BotConfigPage() {
                 <CardHeader>
                   <CardTitle>Entrega a Domicilio</CardTitle>
                   <CardDescription>
-                    Configura opciones de entrega
+                    Opcional. Si activas entregas, el bot podrá agendar slots de entrega (pago contra entrega). Necesitas un Calendar ID.
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
@@ -1235,6 +1249,25 @@ export default function BotConfigPage() {
                   </div>
                   {config.tools_config.delivery_available && (
                     <>
+                      <div className="space-y-2">
+                        <Label>Calendar ID (para agendar entregas)</Label>
+                        <Input
+                          value={config.tools_config.calendar_id || ""}
+                          onChange={(e) =>
+                            setConfig({
+                              ...config,
+                              tools_config: {
+                                ...config.tools_config,
+                                calendar_id: e.target.value,
+                              },
+                            })
+                          }
+                          placeholder="xxx@group.calendar.google.com"
+                        />
+                        <p className="text-xs text-muted-foreground">
+                          Obligatorio si ofreces entregas. Donde se crean los slots de entrega.
+                        </p>
+                      </div>
                       <div className="grid gap-4 md:grid-cols-2">
                         <div className="space-y-2">
                           <Label>Costo de Entrega</Label>

@@ -10,6 +10,11 @@ export interface Client {
   created_at: string
 }
 
+/**
+ * tools_config: configuración del bot por tipo de negocio.
+ * business_type define citas, catálogo, profesionales, etc.
+ * working_days: 1 = Lunes, 7 = Domingo (según README bot).
+ */
 export interface ToolsConfig {
   business_type?: "salon" | "clinic" | "store" | "restaurant" | "general"
   timezone?: string
@@ -17,13 +22,18 @@ export interface ToolsConfig {
     start: string
     end: string
   }
+  /** Días laborables: 1 = Lunes, 7 = Domingo. */
   working_days?: number[]
-  /** Duración de slots en minutos (salon). */
+  /** Duración de slots en minutos (salon, general). */
   slot_duration?: number
+  /** Servicios con precio y duración (salon, clinic). */
   services?: Array<{
     name: string
     price: number
+    /** Duración en minutos (recomendado). */
     duration_minutes?: number
+    /** Alias aceptado en algunos flujos. */
+    duration?: number
   }>
   professionals?: Array<{
     id: string
@@ -38,6 +48,7 @@ export interface ToolsConfig {
     consultation_price?: number
     slot_duration?: number
   }>
+  /** Catálogo por categorías (store). */
   catalog?: {
     categories: Array<{
       name: string
@@ -48,20 +59,24 @@ export interface ToolsConfig {
       }>
     }>
   }
-  /** Áreas del restaurante: nombres (ej. Terraza, Salón principal, VIP). */
+  /** Áreas para reservar (restaurant). */
   areas?: string[]
+  /** Sugerencias de ocasión en UI; el bot pide texto libre. */
   occasions?: string[]
   menu_url?: string
+  /** Obligatorio en salon, clinic, restaurant, general; opcional en store (solo entregas). */
   calendar_id?: string
   contact_phone?: string
   currency?: string
   requires_insurance?: boolean
+  /** Store: habilita agendar entregas a domicilio (requiere calendar_id). */
   delivery_available?: boolean
   delivery_fee?: number
+  /** Monto mínimo para envío gratis (store). */
   free_delivery_minimum?: number
-  /** Horario de entregas (store). */
+  /** Horario para slots de entrega (store); si no, usa business_hours. */
   delivery_hours?: { start: string; end: string }
-  /** Duración estimada de entrega en minutos (store). */
+  /** Duración en minutos por slot de entrega (store, default 60). */
   delivery_duration?: number
 }
 

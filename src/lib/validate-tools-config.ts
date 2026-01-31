@@ -19,49 +19,49 @@ export function validateToolsConfig(config: ToolsConfig): ValidationError[] {
         })
     }
 
-    if (!config.timezone) {
-        errors.push({
-            field: "timezone",
-            message: "La zona horaria es requerida",
-        })
+    // timezone recomendado para todos; no obligatorio
+
+    // business_hours y working_days obligatorios en salon, clinic, restaurant, general
+    const needsHours =
+        config.business_type === "salon" ||
+        config.business_type === "clinic" ||
+        config.business_type === "restaurant" ||
+        config.business_type === "general"
+    if (needsHours) {
+        if (!config.business_hours?.start || !config.business_hours?.end) {
+            errors.push({ field: "business_hours", message: "Los horarios de negocio son requeridos para este tipo" })
+        }
+        if (!Array.isArray(config.working_days) || config.working_days.length === 0) {
+            errors.push({ field: "working_days", message: "Los días laborables son requeridos para este tipo" })
+        }
     }
 
-    // Validaciones específicas por tipo de negocio
+    // Validaciones específicas por tipo de negocio (según README bot)
     if (config.business_type === "general") {
-        // General no requiere validaciones adicionales
+        if (!config.calendar_id?.trim()) {
+            errors.push({ field: "calendar_id", message: "El tipo general requiere un Calendar ID para citas" })
+        }
     } else if (config.business_type === "clinic") {
+        if (!config.calendar_id?.trim()) {
+            errors.push({ field: "calendar_id", message: "El tipo clinic requiere un Calendar ID (general o por profesional)" })
+        }
         if (!config.professionals || config.professionals.length === 0) {
             errors.push({
                 field: "professionals",
                 message: "Las clínicas deben tener al menos un profesional",
             })
         }
-
-        if (!config.services || config.services.length === 0) {
-            errors.push({
-                field: "services",
-                message: "Las clínicas deben tener al menos un servicio",
-            })
-        }
-
-        // Validar que cada profesional tenga calendar_id si hay múltiples
-        if (config.professionals && config.professionals.length > 1) {
-            config.professionals.forEach((prof, index) => {
-                if (!prof.calendar_id) {
-                    errors.push({
-                        field: `professionals[${index}].calendar_id`,
-                        message: `El profesional ${prof.name} debe tener un calendar_id cuando hay múltiples profesionales`,
-                    })
-                }
-            })
-        }
+        // services opcional en clinic (consultas opcionales)
     }
 
     if (config.business_type === "salon") {
+        if (!config.calendar_id?.trim()) {
+            errors.push({ field: "calendar_id", message: "El tipo salon requiere un Calendar ID de Google" })
+        }
         if (!config.services || config.services.length === 0) {
             errors.push({
                 field: "services",
-                message: "Los salones deben tener al menos un servicio (con nombre, precio y duration_minutes)",
+                message: "Debe haber al menos un servicio (nombre, precio y duration_minutes)",
             })
         }
         if (config.slot_duration != null && (typeof config.slot_duration !== "number" || config.slot_duration <= 0)) {
@@ -73,13 +73,12 @@ export function validateToolsConfig(config: ToolsConfig): ValidationError[] {
     }
 
     if (config.business_type === "restaurant") {
+        if (!config.calendar_id?.trim()) {
+            errors.push({ field: "calendar_id", message: "El tipo restaurant requiere un Calendar ID para reservas" })
+        }
+        // areas opcional: variante "básico" solo reservas sin áreas (README 4.1)
         const areas = config.areas
-        if (!Array.isArray(areas) || areas.length === 0) {
-            errors.push({
-                field: "areas",
-                message: "Los restaurantes deben tener al menos un área (ej: Terraza, Salón principal)",
-            })
-        } else {
+        if (Array.isArray(areas) && areas.length > 0) {
             const invalid = areas.some((a) => typeof a !== "string" || !String(a).trim())
             if (invalid) {
                 errors.push({
@@ -95,6 +94,13 @@ export function validateToolsConfig(config: ToolsConfig): ValidationError[] {
             errors.push({
                 field: "catalog",
                 message: "Las tiendas deben tener al menos una categoría en el catálogo",
+            })
+        }
+        // calendar_id opcional en store; solo obligatorio si hay entregas a domicilio
+        if (config.delivery_available && !config.calendar_id) {
+            errors.push({
+                field: "calendar_id",
+                message: "Si ofreces entregas a domicilio, debes configurar un Calendar ID para agendar entregas",
             })
         }
         if (config.delivery_hours) {
@@ -147,14 +153,14 @@ export function validateToolsConfig(config: ToolsConfig): ValidationError[] {
         }
     }
 
-    // Validar working_days
+    // Validar working_days: 1 = Lunes, 7 = Domingo (según README bot)
     if (config.working_days) {
-        const validDays = [0, 1, 2, 3, 4, 5, 6]
+        const validDays = [1, 2, 3, 4, 5, 6, 7]
         const invalidDays = config.working_days.filter((day) => !validDays.includes(day))
         if (invalidDays.length > 0) {
             errors.push({
                 field: "working_days",
-                message: `Días inválidos: ${invalidDays.join(", ")}. Deben ser números del 0 (Domingo) al 6 (Sábado)`,
+                message: `Días inválidos: ${invalidDays.join(", ")}. Deben ser números del 1 (Lunes) al 7 (Domingo)`,
             })
         }
     }
@@ -210,9 +216,11 @@ export function validateToolsConfig(config: ToolsConfig): ValidationError[] {
 export function normalizeToolsConfig(config: ToolsConfig): ToolsConfig {
     const normalized = { ...config }
 
-    // Asegurar que working_days esté ordenado
-    if (normalized.working_days) {
-        normalized.working_days = [...normalized.working_days].sort((a, b) => a - b)
+    // working_days: 1 = Lunes, 7 = Domingo. Migrar 0 (Domingo antiguo) → 7
+    if (normalized.working_days?.length) {
+        normalized.working_days = [...new Set(
+            normalized.working_days.map((d) => (d === 0 ? 7 : d))
+        )].filter((d) => d >= 1 && d <= 7).sort((a, b) => a - b)
     }
 
     // Asegurar que currency tenga un valor por defecto
