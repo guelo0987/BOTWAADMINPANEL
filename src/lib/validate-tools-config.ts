@@ -5,11 +5,20 @@ export interface ValidationError {
     message: string
 }
 
+export interface ValidateToolsConfigOptions {
+    /** Si es true, no se exige calendar_id al crear (el cliente lo configurará en su panel). */
+    allowMissingCalendarId?: boolean
+}
+
 /**
  * Valida tools_config según el business_type
  */
-export function validateToolsConfig(config: ToolsConfig): ValidationError[] {
+export function validateToolsConfig(
+    config: ToolsConfig,
+    options?: ValidateToolsConfigOptions
+): ValidationError[] {
     const errors: ValidationError[] = []
+    const allowMissingCalendarId = options?.allowMissingCalendarId === true
 
     // Validaciones comunes
     if (!config.business_type) {
@@ -37,12 +46,13 @@ export function validateToolsConfig(config: ToolsConfig): ValidationError[] {
     }
 
     // Validaciones específicas por tipo de negocio (según README bot)
+    // calendar_id requerido salvo allowMissingCalendarId (ej. creación desde admin; el cliente lo pone en su panel)
     if (config.business_type === "general") {
-        if (!config.calendar_id?.trim()) {
+        if (!allowMissingCalendarId && !config.calendar_id?.trim()) {
             errors.push({ field: "calendar_id", message: "El tipo general requiere un Calendar ID para citas" })
         }
     } else if (config.business_type === "clinic") {
-        if (!config.calendar_id?.trim()) {
+        if (!allowMissingCalendarId && !config.calendar_id?.trim()) {
             errors.push({ field: "calendar_id", message: "El tipo clinic requiere un Calendar ID (general o por profesional)" })
         }
         if (!config.professionals || config.professionals.length === 0) {
@@ -55,7 +65,7 @@ export function validateToolsConfig(config: ToolsConfig): ValidationError[] {
     }
 
     if (config.business_type === "salon") {
-        if (!config.calendar_id?.trim()) {
+        if (!allowMissingCalendarId && !config.calendar_id?.trim()) {
             errors.push({ field: "calendar_id", message: "El tipo salon requiere un Calendar ID de Google" })
         }
         if (!config.services || config.services.length === 0) {
@@ -73,7 +83,7 @@ export function validateToolsConfig(config: ToolsConfig): ValidationError[] {
     }
 
     if (config.business_type === "restaurant") {
-        if (!config.calendar_id?.trim()) {
+        if (!allowMissingCalendarId && !config.calendar_id?.trim()) {
             errors.push({ field: "calendar_id", message: "El tipo restaurant requiere un Calendar ID para reservas" })
         }
         // areas opcional: variante "básico" solo reservas sin áreas (README 4.1)
@@ -90,11 +100,21 @@ export function validateToolsConfig(config: ToolsConfig): ValidationError[] {
     }
 
     if (config.business_type === "store") {
-        if (!config.catalog || !config.catalog.categories || config.catalog.categories.length === 0) {
-            errors.push({
-                field: "catalog",
-                message: "Las tiendas deben tener al menos una categoría en el catálogo",
-            })
+        const source = config.catalog_source || "manual"
+        if (source === "pdf") {
+            if (!config.catalog_pdf_key?.trim()) {
+                errors.push({
+                    field: "catalog_pdf_key",
+                    message: "Debes subir un PDF de catálogo o elegir catálogo manual",
+                })
+            }
+        } else {
+            if (!config.catalog || !config.catalog.categories || config.catalog.categories.length === 0) {
+                errors.push({
+                    field: "catalog",
+                    message: "Las tiendas deben tener al menos una categoría en el catálogo (o usar catálogo en PDF)",
+                })
+            }
         }
         // calendar_id opcional en store; solo obligatorio si hay entregas a domicilio
         if (config.delivery_available && !config.calendar_id) {
@@ -226,6 +246,11 @@ export function normalizeToolsConfig(config: ToolsConfig): ToolsConfig {
     // Asegurar que currency tenga un valor por defecto
     if (!normalized.currency) {
         normalized.currency = "$"
+    }
+
+    // catalog_source solo indica cuál usa el bot (manual o pdf). No borramos el otro: se guardan ambos (catalog_pdf_key y catalog/services) para que al cambiar de opción sigan ahí.
+    if (normalized.catalog_source !== "pdf" && normalized.catalog_source !== "manual") {
+        normalized.catalog_source = normalized.catalog_pdf_key ? "pdf" : "manual"
     }
 
     return normalized

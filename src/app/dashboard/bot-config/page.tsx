@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import {
   Card,
   CardContent,
@@ -37,19 +37,153 @@ import {
   Settings,
   Eye,
   Loader2,
+  FileUp,
+  FileText,
+  ExternalLink,
 } from "lucide-react"
 import { mockClientConfig } from "@/lib/mock-data"
 import { useAuth } from "@/lib/auth-context"
 import { Client } from "@/types"
 import { useToast } from "@/hooks/use-toast"
 
+function CatalogPdfUpload({
+  clientId,
+  catalogPdfKey,
+  onUploaded,
+  onCleared,
+}: {
+  clientId: number | undefined
+  catalogPdfKey: string | undefined
+  onUploaded: (key: string) => void
+  onCleared: () => void
+}) {
+  const [uploading, setUploading] = useState(false)
+  const [viewUrl, setViewUrl] = useState<string | null>(null)
+  const { toast } = useToast()
+  const fileInputRef = useRef<HTMLInputElement | null>(null)
+
+  const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file || file.type !== "application/pdf") {
+      toast({ title: "Selecciona un archivo PDF", variant: "destructive" })
+      return
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      toast({ title: "El archivo no puede superar 10 MB", variant: "destructive" })
+      return
+    }
+    setUploading(true)
+    try {
+      const form = new FormData()
+      form.append("file", file)
+      const res = await fetch("/api/client/catalog/upload", {
+        method: "POST",
+        body: form,
+        credentials: "include",
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data.error || "Error al subir")
+      onUploaded(data.catalog_pdf_key)
+      toast({
+        title: "PDF subido correctamente",
+        description: "Haz clic en «Guardar Cambios» arriba para guardar la configuración.",
+      })
+    } catch (err) {
+      toast({
+        title: "Error",
+        description: err instanceof Error ? err.message : "No se pudo subir el PDF",
+        variant: "destructive",
+      })
+    } finally {
+      setUploading(false)
+      e.target.value = ""
+    }
+  }
+
+  const loadViewUrl = async () => {
+    if (viewUrl) {
+      window.open(viewUrl, "_blank")
+      return
+    }
+    try {
+      const res = await fetch("/api/client/catalog/signed-url", { credentials: "include" })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data.error || "Error al obtener enlace")
+      setViewUrl(data.url)
+      window.open(data.url, "_blank")
+    } catch (err) {
+      toast({
+        title: "Error",
+        description: err instanceof Error ? err.message : "No se pudo abrir el PDF",
+        variant: "destructive",
+      })
+    }
+  }
+
+  return (
+    <div className="space-y-3 rounded-lg border border-border p-4 bg-muted/30">
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".pdf,application/pdf"
+        className="hidden"
+        onChange={handleFile}
+        disabled={uploading || !clientId}
+      />
+      {catalogPdfKey ? (
+        <div className="flex flex-wrap items-center gap-3">
+          <FileText className="h-5 w-5 text-muted-foreground" />
+          <span className="text-sm font-medium">Catálogo en PDF</span>
+          <Button type="button" variant="outline" size="sm" onClick={loadViewUrl}>
+            <ExternalLink className="h-4 w-4 mr-1" />
+            Ver / Descargar
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={uploading || !clientId}
+            onClick={() => fileInputRef.current?.click()}
+          >
+            {uploading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <FileUp className="h-4 w-4 mr-2" />}
+            Cambiar PDF
+          </Button>
+          <Button type="button" variant="ghost" size="sm" onClick={onCleared} className="text-destructive">
+            Quitar PDF
+          </Button>
+        </div>
+      ) : (
+        <div className="flex flex-wrap items-center gap-3">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={uploading || !clientId}
+            onClick={() => fileInputRef.current?.click()}
+          >
+            {uploading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <FileUp className="h-4 w-4 mr-2" />}
+            Subir PDF de catálogo
+          </Button>
+          <span className="text-xs text-muted-foreground">Máx. 10 MB. Después haz clic en «Guardar Cambios».</span>
+        </div>
+      )}
+    </div>
+  )
+}
+
 export default function BotConfigPage() {
   const { user } = useAuth()
   const [config, setConfig] = useState<Client | null>(null)
+  const configRef = useRef<Client | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
   const [showPromptPreview, setShowPromptPreview] = useState(false)
   const { toast } = useToast()
+
+  // Mantener ref actualizada para que Guardar siempre envíe el estado más reciente (evita que borrados no se persistan)
+  useEffect(() => {
+    configRef.current = config
+  }, [config])
 
   // Cargar configuración al montar
   useEffect(() => {
@@ -58,14 +192,18 @@ export default function BotConfigPage() {
 
       try {
         setIsLoading(true)
-        const response = await fetch(`/api/client/config?client_id=${user.id}`)
-        
+        const response = await fetch(`/api/client/config?client_id=${user.id}`, {
+          credentials: "include",
+        })
         if (!response.ok) {
           throw new Error("Failed to load config")
         }
 
         const data = await response.json()
-        
+
+        console.log("[loadConfig] Respuesta API (data):", data)
+        console.log("[loadConfig] data.tools_config (crudo):", data.tools_config)
+
         // Parsear tools_config si viene como string o asegurar que sea objeto
         let toolsConfig = data.tools_config
         if (typeof toolsConfig === 'string') {
@@ -78,15 +216,58 @@ export default function BotConfigPage() {
         if (!toolsConfig || typeof toolsConfig !== 'object') {
           toolsConfig = {}
         }
-        
-        // Normalizar configuración: asegurar que los campos opcionales estén inicializados
-        // IMPORTANTE: Preservar todos los campos existentes de toolsConfig
+
+        console.log("[loadConfig] toolsConfig parseado:", toolsConfig)
+        console.log("[loadConfig] BD catalog_source:", toolsConfig.catalog_source, "| catalog_pdf_key:", toolsConfig.catalog_pdf_key, "| catalog:", toolsConfig.catalog, "| services:", toolsConfig.services)
+
+        // Traer de BD: los dos pueden existir; el usuario elige con el radio cuál usa el bot (y Guardar persiste esa elección).
+        const catalogPdfKeyFromDb =
+          toolsConfig.catalog_pdf_key != null && String(toolsConfig.catalog_pdf_key).trim() !== ""
+            ? String(toolsConfig.catalog_pdf_key).trim()
+            : undefined
+        const catalogSourceFromDb = toolsConfig.catalog_source === "pdf" || toolsConfig.catalog_source === "manual" ? toolsConfig.catalog_source : null
+        const catalogSource =
+          catalogSourceFromDb === "pdf" && catalogPdfKeyFromDb
+            ? "pdf"
+            : catalogSourceFromDb === "manual"
+              ? "manual"
+              : catalogPdfKeyFromDb
+                ? "pdf"
+                : "manual"
+
+        const catalogFromDb = toolsConfig.catalog && typeof toolsConfig.catalog === "object" ? toolsConfig.catalog : null
+        const categoriesFromDb = catalogFromDb && Array.isArray(catalogFromDb.categories) ? catalogFromDb.categories : null
+        const hasServices = Array.isArray(toolsConfig.services) && toolsConfig.services.length > 0
+        const servicesList = (toolsConfig.services || []) as { name: string; price: number; duration_minutes?: number }[]
+
+        // Siempre llenar catalog.categories para mostrar en modo manual: BD o migrar desde services.
+        const catalogCategories =
+          categoriesFromDb !== null && categoriesFromDb.length > 0
+            ? categoriesFromDb
+            : hasServices
+              ? [
+                  {
+                    name: "Servicios",
+                    products: servicesList.map((s) => ({
+                      name: s.name,
+                      price: s.price,
+                      description: s.duration_minutes ? `${s.duration_minutes} min` : undefined,
+                    })),
+                  },
+                ]
+              : []
+
+        console.log("[loadConfig] derivado:", {
+          catalogPdfKeyFromDb,
+          catalogSourceFromDb,
+          catalogSource,
+          catalogCategoriesLength: catalogCategories.length,
+        })
+
         const normalizedConfig: Client = {
           ...data,
           tools_config: {
-            // Primero, copiar todos los campos existentes de toolsConfig
             ...toolsConfig,
-            // Luego, asegurar valores por defecto solo si no existen
             business_type: toolsConfig.business_type || "general",
             timezone: toolsConfig.timezone || "America/Santo_Domingo",
             currency: toolsConfig.currency || "$",
@@ -95,7 +276,6 @@ export default function BotConfigPage() {
               end: "18:00",
             },
             working_days: toolsConfig.working_days || [1, 2, 3, 4, 5],
-            // Campos específicos por tipo - preservar arrays existentes
             services: Array.isArray(toolsConfig.services) ? toolsConfig.services : [],
             professionals: Array.isArray(toolsConfig.professionals) ? toolsConfig.professionals : [],
             areas: Array.isArray(toolsConfig.areas)
@@ -104,7 +284,9 @@ export default function BotConfigPage() {
                 )
               : [],
             occasions: Array.isArray(toolsConfig.occasions) ? toolsConfig.occasions : [],
-            catalog: toolsConfig.catalog || { categories: [] },
+            catalog_source: catalogSource,
+            catalog_pdf_key: catalogPdfKeyFromDb ?? undefined,
+            catalog: { categories: catalogCategories },
             // Campos opcionales - usar valores existentes o undefined
             calendar_id: toolsConfig.calendar_id,
             contact_phone: toolsConfig.contact_phone,
@@ -118,6 +300,7 @@ export default function BotConfigPage() {
             delivery_duration: toolsConfig.delivery_duration,
           },
         }
+        console.log("[loadConfig] normalizedConfig.tools_config (lo que se pone en estado):", normalizedConfig.tools_config)
         setConfig(normalizedConfig)
       } catch (error) {
         toast({
@@ -136,22 +319,24 @@ export default function BotConfigPage() {
   }, [user?.id, toast])
 
   const handleSave = async () => {
-    if (!config || !user?.id) return
+    const latest = configRef.current ?? config
+    if (!latest || !user?.id) return
 
     try {
       setIsSaving(true)
       const response = await fetch("/api/client/config", {
         method: "PUT",
+        credentials: "include",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
           client_id: user.id,
-          business_name: config.business_name,
-          whatsapp_instance_id: config.whatsapp_instance_id,
-          is_active: config.is_active,
-          system_prompt_template: config.system_prompt_template,
-          tools_config: config.tools_config,
+          business_name: latest.business_name,
+          whatsapp_instance_id: latest.whatsapp_instance_id,
+          is_active: latest.is_active,
+          system_prompt_template: latest.system_prompt_template,
+          tools_config: latest.tools_config,
         }),
       })
 
@@ -666,135 +851,8 @@ export default function BotConfigPage() {
           </Card>
         </TabsContent>
 
-        {/* Services Tab */}
+        {/* Services Tab = Catálogo (lo que el bot ofrece: manual o PDF) */}
         <TabsContent value="services" className="space-y-4">
-          {/* Servicios para salon y clinic (opcional en clinic; ver README) */}
-          {(config.tools_config.business_type === "salon" || config.tools_config.business_type === "clinic") && (
-            <Card>
-              <CardHeader>
-                <CardTitle>Servicios disponibles</CardTitle>
-                <CardDescription>
-                  {config.tools_config.business_type === "salon"
-                    ? "Lista de servicios con precio y duración (el bot los muestra al cliente)."
-                    : "Servicios/consultas opcionales; el bot los muestra y usa para calcular slots."}
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-              {Array.isArray(config.tools_config.services) && config.tools_config.services.length > 0 ? (
-                <>
-                  {config.tools_config.services.map((service, index) => (
-                    <div
-                      key={index}
-                      className="flex items-center gap-4 p-4 rounded-lg border border-border"
-                    >
-                      <div className="flex-1 grid gap-4 md:grid-cols-3">
-                        <Input
-                          placeholder="Nombre del servicio"
-                          value={service.name}
-                          onChange={(e) => {
-                            const newServices = [...(config.tools_config.services || [])]
-                            newServices[index] = { ...service, name: e.target.value }
-                            setConfig({
-                              ...config,
-                              tools_config: {
-                                ...config.tools_config,
-                                services: newServices,
-                              },
-                            })
-                          }}
-                        />
-                        <Input
-                          type="number"
-                          placeholder="Precio"
-                          value={service.price}
-                          onChange={(e) => {
-                            const newServices = [...(config.tools_config.services || [])]
-                            newServices[index] = {
-                              ...service,
-                              price: Number(e.target.value),
-                            }
-                            setConfig({
-                              ...config,
-                              tools_config: {
-                                ...config.tools_config,
-                                services: newServices,
-                              },
-                            })
-                          }}
-                        />
-                        <Input
-                          type="number"
-                          placeholder="Duración (min)"
-                          value={service.duration_minutes || ""}
-                          onChange={(e) => {
-                            const newServices = [...(config.tools_config.services || [])]
-                            newServices[index] = {
-                              ...service,
-                              duration_minutes: Number(e.target.value),
-                            }
-                            setConfig({
-                              ...config,
-                              tools_config: {
-                                ...config.tools_config,
-                                services: newServices,
-                              },
-                            })
-                          }}
-                        />
-                      </div>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="text-destructive hover:text-destructive"
-                        onClick={() => {
-                          const newServices = config.tools_config.services?.filter(
-                            (_, i) => i !== index
-                          )
-                          setConfig({
-                            ...config,
-                            tools_config: {
-                              ...config.tools_config,
-                              services: newServices,
-                            },
-                          })
-                        }}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  ))}
-                </>
-              ) : (
-                <div className="text-center py-8 text-muted-foreground">
-                  <p>No hay servicios configurados</p>
-                  <p className="text-sm mt-2">Agrega tu primer servicio usando el botón de abajo</p>
-                </div>
-              )}
-
-              <Button
-                variant="outline"
-                className="w-full bg-transparent"
-                onClick={() => {
-                  const newServices = [
-                    ...(config.tools_config.services || []),
-                    { name: "", price: 0, duration_minutes: 30 },
-                  ]
-                  setConfig({
-                    ...config,
-                    tools_config: {
-                      ...config.tools_config,
-                      services: newServices,
-                    },
-                  })
-                }}
-              >
-                <Plus className="h-4 w-4 mr-2" />
-                Agregar Servicio
-              </Button>
-            </CardContent>
-          </Card>
-          )}
-
           {/* Requires Insurance para clinic */}
           {config.tools_config.business_type === "clinic" && (
             <Card>
@@ -857,20 +915,22 @@ export default function BotConfigPage() {
                         }}
                       />
                       <Button
+                        type="button"
                         variant="ghost"
                         size="icon"
                         className="text-destructive hover:text-destructive"
                         onClick={() => {
-                          const newAreas = (config.tools_config.areas || []).filter(
-                            (_, i) => i !== index
+                          setConfig((prev) =>
+                            prev
+                              ? {
+                                  ...prev,
+                                  tools_config: {
+                                    ...prev.tools_config,
+                                    areas: (prev.tools_config.areas ?? []).filter((_, i) => i !== index),
+                                  },
+                                }
+                              : prev
                           )
-                          setConfig({
-                            ...config,
-                            tools_config: {
-                              ...config.tools_config,
-                              areas: newAreas,
-                            },
-                          })
                         }}
                       >
                         <Trash2 className="h-4 w-4" />
@@ -878,17 +938,21 @@ export default function BotConfigPage() {
                     </div>
                   ))}
                   <Button
+                    type="button"
                     variant="outline"
                     className="w-full bg-transparent"
                     onClick={() => {
-                      const newAreas = [...(config.tools_config.areas || []), ""]
-                      setConfig({
-                        ...config,
-                        tools_config: {
-                          ...config.tools_config,
-                          areas: newAreas,
-                        },
-                      })
+                      setConfig((prev) =>
+                        prev
+                          ? {
+                              ...prev,
+                              tools_config: {
+                                ...prev.tools_config,
+                                areas: [...(prev.tools_config.areas ?? []), ""],
+                              },
+                            }
+                          : prev
+                      )
                     }}
                   >
                     <Plus className="h-4 w-4 mr-2" />
@@ -985,245 +1049,303 @@ export default function BotConfigPage() {
             </>
           )}
 
-          {/* Catalog para store */}
-          {config.tools_config.business_type === "store" && (
-            <>
-              <Card>
-                <CardHeader>
-                  <CardTitle>Catálogo de Productos</CardTitle>
-                  <CardDescription>
-                    Organiza tus productos por categorías
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-6">
-                  {config.tools_config.catalog?.categories?.map(
-                    (category, catIndex) => (
-                      <div
-                        key={catIndex}
-                        className="p-4 rounded-lg border border-border space-y-4"
-                      >
-                        <div className="flex items-center gap-2">
-                          <Input
-                            placeholder="Nombre de categoría"
-                            value={category.name}
-                            onChange={(e) => {
-                              const newCatalog = {
-                                ...config.tools_config.catalog,
-                                categories: [
-                                  ...(config.tools_config.catalog?.categories || []),
-                                ],
-                              }
-                              newCatalog.categories[catIndex] = {
-                                ...category,
-                                name: e.target.value,
-                              }
-                              setConfig({
-                                ...config,
+          {/* Catálogo: lo que el bot ofrece. Manual (categorías/productos) o PDF. El bot lo lee. */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Catálogo</CardTitle>
+              <CardDescription>
+                Lo que ofreces al cliente. Manual (categorías y productos/servicios) o sube un PDF. Tu bot leerá esto.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="space-y-2">
+                <Label>Origen del catálogo</Label>
+                <div className="flex gap-4">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="catalog_source"
+                      checked={(config.tools_config.catalog_source || "manual") === "manual"}
+                      onChange={() => {
+                        setConfig((prev) =>
+                          prev
+                            ? {
+                                ...prev,
                                 tools_config: {
-                                  ...config.tools_config,
-                                  catalog: newCatalog,
+                                  ...prev.tools_config,
+                                  catalog_source: "manual",
+                                  // No borrar catalog_pdf_key: el cliente puede volver a PDF y seguirá ahí
                                 },
-                              })
-                            }}
-                            className="font-semibold"
-                          />
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="text-destructive"
-                            onClick={() => {
-                              const newCategories =
-                                config.tools_config.catalog?.categories?.filter(
-                                  (_, i) => i !== catIndex
-                                )
-                              setConfig({
-                                ...config,
-                                tools_config: {
-                                  ...config.tools_config,
-                                  catalog: {
-                                    categories: newCategories || [],
-                                  },
-                                },
-                              })
-                            }}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                        <div className="space-y-2 pl-4">
-                          {category.products?.map((product, prodIndex) => (
-                            <div
-                              key={prodIndex}
-                              className="flex flex-wrap items-center gap-2"
-                            >
-                              <Input
-                                placeholder="Nombre del producto"
-                                value={product.name}
-                                onChange={(e) => {
-                                  const newCatalog = {
-                                    ...config.tools_config.catalog,
-                                    categories: [
-                                      ...(config.tools_config.catalog?.categories ||
-                                        []),
-                                    ],
-                                  }
-                                  newCatalog.categories[catIndex].products[
-                                    prodIndex
-                                  ] = { ...product, name: e.target.value }
-                                  setConfig({
-                                    ...config,
-                                    tools_config: {
-                                      ...config.tools_config,
-                                      catalog: newCatalog,
-                                    },
-                                  })
-                                }}
-                                className="min-w-[140px]"
-                              />
-                              <Input
-                                type="number"
-                                placeholder="Precio"
-                                value={product.price}
-                                onChange={(e) => {
-                                  const newCatalog = {
-                                    ...config.tools_config.catalog,
-                                    categories: [
-                                      ...(config.tools_config.catalog?.categories ||
-                                        []),
-                                    ],
-                                  }
-                                  newCatalog.categories[catIndex].products[
-                                    prodIndex
-                                  ] = {
-                                    ...product,
-                                    price: Number(e.target.value),
-                                  }
-                                  setConfig({
-                                    ...config,
-                                    tools_config: {
-                                      ...config.tools_config,
-                                      catalog: newCatalog,
-                                    },
-                                  })
-                                }}
-                                className="w-28"
-                              />
-                              <Input
-                                placeholder="Descripción (opcional)"
-                                value={product.description ?? ""}
-                                onChange={(e) => {
-                                  const newCatalog = {
-                                    ...config.tools_config.catalog,
-                                    categories: [
-                                      ...(config.tools_config.catalog?.categories ||
-                                        []),
-                                    ],
-                                  }
-                                  newCatalog.categories[catIndex].products[
-                                    prodIndex
-                                  ] = {
-                                    ...product,
-                                    description: e.target.value || undefined,
-                                  }
-                                  setConfig({
-                                    ...config,
-                                    tools_config: {
-                                      ...config.tools_config,
-                                      catalog: newCatalog,
-                                    },
-                                  })
-                                }}
-                                className="min-w-[180px] flex-1 max-w-xs"
-                              />
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="text-destructive"
-                                onClick={() => {
-                                  const newCatalog = {
-                                    ...config.tools_config.catalog,
-                                    categories: [
-                                      ...(config.tools_config.catalog?.categories ||
-                                        []),
-                                    ],
-                                  }
-                                  newCatalog.categories[catIndex].products =
-                                    category.products?.filter(
-                                      (_, i) => i !== prodIndex
-                                    ) || []
-                                  setConfig({
-                                    ...config,
-                                    tools_config: {
-                                      ...config.tools_config,
-                                      catalog: newCatalog,
-                                    },
-                                  })
-                                }}
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </div>
-                          ))}
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => {
-                              const newCatalog = {
-                                ...config.tools_config.catalog,
-                                categories: [
-                                  ...(config.tools_config.catalog?.categories ||
-                                    []),
-                                ],
                               }
-                              if (!newCatalog.categories[catIndex].products) {
-                                newCatalog.categories[catIndex].products = []
-                              }
-                              newCatalog.categories[catIndex].products.push({
-                                name: "",
-                                price: 0,
-                                description: undefined,
-                              })
-                              setConfig({
-                                ...config,
+                            : prev
+                        )
+                      }}
+                      className="rounded border-input"
+                    />
+                    <span>Manual (categorías y productos)</span>
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="catalog_source"
+                      checked={config.tools_config.catalog_source === "pdf"}
+                      onChange={() => {
+                        setConfig((prev) =>
+                          prev
+                            ? {
+                                ...prev,
                                 tools_config: {
-                                  ...config.tools_config,
-                                  catalog: newCatalog,
+                                  ...prev.tools_config,
+                                  catalog_source: "pdf",
                                 },
-                              })
-                            }}
-                          >
-                            <Plus className="h-4 w-4 mr-1" />
-                            Agregar Producto
-                          </Button>
-                        </div>
-                      </div>
+                              }
+                            : prev
+                        )
+                      }}
+                      className="rounded border-input"
+                    />
+                    <span>Catálogo en PDF</span>
+                  </label>
+                </div>
+              </div>
+
+              {(config.tools_config.catalog_source || "manual") === "pdf" && (
+                <CatalogPdfUpload
+                  clientId={user?.id}
+                  catalogPdfKey={config.tools_config.catalog_pdf_key}
+                  onUploaded={(key) => {
+                    setConfig((prev) =>
+                      prev
+                        ? {
+                            ...prev,
+                            tools_config: {
+                              ...prev.tools_config,
+                              catalog_pdf_key: key,
+                            },
+                          }
+                        : prev
                     )
-                  )}
+                  }}
+                  onCleared={() => {
+                    setConfig((prev) =>
+                      prev
+                        ? {
+                            ...prev,
+                            tools_config: {
+                              ...prev.tools_config,
+                              catalog_pdf_key: undefined,
+                            },
+                          }
+                        : prev
+                    )
+                  }}
+                />
+              )}
+
+              {(config.tools_config.catalog_source || "manual") === "manual" && (
+                <>
+                  {(config.tools_config.catalog?.categories ?? []).map((category, catIndex) => (
+                    <div
+                      key={catIndex}
+                      className="p-4 rounded-lg border border-border space-y-4"
+                    >
+                      <div className="flex items-center gap-2">
+                        <Input
+                          placeholder="Nombre de categoría"
+                          value={category.name}
+                          onChange={(e) => {
+                            const name = e.target.value
+                            setConfig((prev) => {
+                              if (!prev) return prev
+                              const cats = [...(prev.tools_config.catalog?.categories ?? [])]
+                              if (cats[catIndex]) cats[catIndex] = { ...cats[catIndex], name }
+                              return {
+                                ...prev,
+                                tools_config: {
+                                  ...prev.tools_config,
+                                  catalog: { categories: cats },
+                                },
+                              }
+                            })
+                          }}
+                          className="font-semibold"
+                        />
+                            <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="text-destructive hover:text-destructive"
+                          onClick={() => {
+                            setConfig((prev) => {
+                              if (!prev) return prev
+                              const cats = prev.tools_config.catalog?.categories ?? []
+                              const newCategories = cats.filter((_, i) => i !== catIndex)
+                              return {
+                                ...prev,
+                                tools_config: {
+                                  ...prev.tools_config,
+                                  catalog: { categories: newCategories },
+                                },
+                              }
+                            })
+                          }}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                      <div className="space-y-2 pl-4">
+                        {(category.products ?? []).map((product, prodIndex) => (
+                          <div
+                            key={prodIndex}
+                            className="flex flex-wrap items-center gap-2"
+                          >
+                            <Input
+                              placeholder="Nombre del producto/servicio"
+                              value={product.name}
+                              onChange={(e) => {
+                                const name = e.target.value
+                                setConfig((prev) => {
+                                  if (!prev) return prev
+                                  const cats = [...(prev.tools_config.catalog?.categories ?? [])]
+                                  const prods = [...(cats[catIndex]?.products ?? [])]
+                                  if (prods[prodIndex]) prods[prodIndex] = { ...prods[prodIndex], name }
+                                  if (cats[catIndex]) cats[catIndex] = { ...cats[catIndex], products: prods }
+                                  return {
+                                    ...prev,
+                                    tools_config: {
+                                      ...prev.tools_config,
+                                      catalog: { categories: cats },
+                                    },
+                                  }
+                                })
+                              }}
+                              className="min-w-[140px]"
+                            />
+                            <Input
+                              type="number"
+                              placeholder="Precio"
+                              value={product.price}
+                              onChange={(e) => {
+                                const price = Number(e.target.value)
+                                setConfig((prev) => {
+                                  if (!prev) return prev
+                                  const cats = [...(prev.tools_config.catalog?.categories ?? [])]
+                                  const prods = [...(cats[catIndex]?.products ?? [])]
+                                  if (prods[prodIndex]) prods[prodIndex] = { ...prods[prodIndex], price }
+                                  if (cats[catIndex]) cats[catIndex] = { ...cats[catIndex], products: prods }
+                                  return {
+                                    ...prev,
+                                    tools_config: {
+                                      ...prev.tools_config,
+                                      catalog: { categories: cats },
+                                    },
+                                  }
+                                })
+                              }}
+                              className="w-28"
+                            />
+                            <Input
+                              placeholder="Descripción (opcional)"
+                              value={product.description ?? ""}
+                              onChange={(e) => {
+                                const description = e.target.value || undefined
+                                setConfig((prev) => {
+                                  if (!prev) return prev
+                                  const cats = [...(prev.tools_config.catalog?.categories ?? [])]
+                                  const prods = [...(cats[catIndex]?.products ?? [])]
+                                  if (prods[prodIndex]) prods[prodIndex] = { ...prods[prodIndex], description }
+                                  if (cats[catIndex]) cats[catIndex] = { ...cats[catIndex], products: prods }
+                                  return {
+                                    ...prev,
+                                    tools_config: {
+                                      ...prev.tools_config,
+                                      catalog: { categories: cats },
+                                    },
+                                  }
+                                })
+                              }}
+                              className="min-w-[180px] flex-1 max-w-xs"
+                            />
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className="text-destructive hover:text-destructive"
+                              onClick={() => {
+                                setConfig((prev) => {
+                                  if (!prev) return prev
+                                  const cats = [...(prev.tools_config.catalog?.categories ?? [])]
+                                  const prodsAntes = cats[catIndex]?.products ?? []
+                                  const prods = prodsAntes.filter((_, i) => i !== prodIndex)
+                                  if (cats[catIndex]) cats[catIndex] = { ...cats[catIndex], products: prods }
+                                  return {
+                                    ...prev,
+                                    tools_config: {
+                                      ...prev.tools_config,
+                                      catalog: { categories: cats },
+                                    },
+                                  }
+                                })
+                              }}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        ))}
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            setConfig((prev) => {
+                              if (!prev) return prev
+                              const cats = [...(prev.tools_config.catalog?.categories ?? [])]
+                              const prods = [...(cats[catIndex]?.products ?? []), { name: "", price: 0 }]
+                              if (cats[catIndex]) cats[catIndex] = { ...cats[catIndex], products: prods }
+                              return {
+                                ...prev,
+                                tools_config: {
+                                  ...prev.tools_config,
+                                  catalog: { categories: cats },
+                                },
+                              }
+                            })
+                          }}
+                        >
+                          <Plus className="h-4 w-4 mr-1" />
+                          Agregar Producto
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
                   <Button
+                    type="button"
                     variant="outline"
                     className="w-full bg-transparent"
                     onClick={() => {
-                      const newCatalog = {
-                        categories: [
-                          ...(config.tools_config.catalog?.categories || []),
-                          { name: "", products: [] },
-                        ],
-                      }
-                      setConfig({
-                        ...config,
-                        tools_config: {
-                          ...config.tools_config,
-                          catalog: newCatalog,
-                        },
+                      setConfig((prev) => {
+                        if (!prev) return prev
+                        const categories = [...(prev.tools_config.catalog?.categories ?? []), { name: "", products: [] }]
+                        return {
+                          ...prev,
+                          tools_config: {
+                            ...prev.tools_config,
+                            catalog: { categories },
+                          },
+                        }
                       })
                     }}
                   >
                     <Plus className="h-4 w-4 mr-2" />
                     Agregar Categoría
                   </Button>
-                </CardContent>
-              </Card>
+                </>
+              )}
+            </CardContent>
+          </Card>
 
+              {/* Entrega a domicilio: solo para tipo store */}
+              {config.tools_config.business_type === "store" && (
               <Card>
                 <CardHeader>
                   <CardTitle>Entrega a Domicilio</CardTitle>
@@ -1363,8 +1485,7 @@ export default function BotConfigPage() {
                   )}
                 </CardContent>
               </Card>
-            </>
-          )}
+              )}
         </TabsContent>
 
         {/* Team Tab */}

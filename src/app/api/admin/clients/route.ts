@@ -112,7 +112,8 @@ export async function POST(req: Request) {
       business_type: bt,
     })
 
-    const errors = validateToolsConfig(mergedToolsConfig)
+    // Al crear desde admin no exigimos calendar_id; el cliente lo configura en Configuración del Bot
+    const errors = validateToolsConfig(mergedToolsConfig, { allowMissingCalendarId: true })
     if (errors.length) {
       return NextResponse.json({ error: "tools_config inválido", errors }, { status: 400 })
     }

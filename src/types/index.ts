@@ -48,7 +48,11 @@ export interface ToolsConfig {
     consultation_price?: number
     slot_duration?: number
   }>
-  /** Catálogo por categorías (store). */
+  /** Origen del catálogo (store): "manual" = categorías/productos en tools_config; "pdf" = PDF en Supabase. */
+  catalog_source?: "manual" | "pdf"
+  /** Path del PDF en bucket Supabase (store, cuando catalog_source === "pdf"). */
+  catalog_pdf_key?: string
+  /** Catálogo por categorías (store, cuando catalog_source === "manual" o no definido). */
   catalog?: {
     categories: Array<{
       name: string
