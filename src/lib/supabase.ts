@@ -19,5 +19,3 @@ export const supabaseAdmin =
         auth: { persistSession: false },
       })
     : null
-
-export const SUPABASE_BUCKET_CATALOGS = process.env.SUPABASE_BUCKET_CATALOGS || "catalogs"

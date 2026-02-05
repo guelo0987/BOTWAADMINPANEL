@@ -18,17 +18,21 @@ export async function GET(req: Request) {
             where: {
                 client_id: user.id,
             },
-            select: {
-                id: true,
-                full_name: true,
-                phone_number: true,
-            },
             orderBy: {
                 full_name: "asc",
             },
         })
 
-        return NextResponse.json(customers)
+        return NextResponse.json(
+            customers.map((c) => ({
+                id: c.id,
+                client_id: c.client_id,
+                phone_number: c.phone_number,
+                full_name: c.full_name,
+                data: c.data ?? {},
+                created_at: c.created_at.toISOString(),
+            }))
+        )
     } catch (error: any) {
         console.error("Error fetching customers:", error)
         return NextResponse.json(

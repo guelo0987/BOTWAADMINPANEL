@@ -32,7 +32,6 @@ import {
   Bot,
   User,
 } from "lucide-react"
-import { mockConversations, mockMessages } from "@/lib/mock-data"
 import type { Conversation, Message } from "@/types"
 import { getAllConversations } from "@/services/conversation.service"
 import { useToast } from "@/hooks/use-toast"

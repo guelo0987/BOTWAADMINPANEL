@@ -1,14 +1,20 @@
-import { mockDashboardStats, mockConversationsChart, mockAppointmentStatus, mockHourlyData, mockCustomers } from "@/lib/mock-data"
 import { DashboardStats, ConversationChartData, AppointmentStatusData, HourlyData } from "@/types"
 import prisma from "@/lib/db"
 import { ConversationMemory } from "@/services/redis.service"
 
+const emptyStats: DashboardStats = {
+    conversations_today: 0,
+    conversations_change: 0,
+    appointments_today: 0,
+    appointments_change: 0,
+    pending_appointments: 0,
+    response_rate: 0,
+    customers_total: 0,
+    customers_new: 0,
+}
+
 export const getDashboardStats = async (clientId?: number): Promise<DashboardStats> => {
-    // Si no hay clientId, usar mock (para desarrollo)
-    if (!clientId) {
-        await new Promise((resolve) => setTimeout(resolve, 500))
-        return mockDashboardStats
-    }
+    if (!clientId) return emptyStats
 
     try {
         // Obtener estadísticas reales desde la base de datos
@@ -67,16 +73,12 @@ export const getDashboardStats = async (clientId?: number): Promise<DashboardSta
         }
     } catch (error) {
         console.error("Error fetching dashboard stats:", error)
-        // Fallback a mock en caso de error
-        return mockDashboardStats
+        return emptyStats
     }
 }
 
 export const getConversationsChartData = async (clientId?: number): Promise<ConversationChartData[]> => {
-    if (!clientId) {
-        await new Promise((resolve) => setTimeout(resolve, 500))
-        return mockConversationsChart
-    }
+    if (!clientId) return []
 
     try {
         // Obtener conversaciones de los últimos 7 días desde Redis
@@ -119,15 +121,19 @@ export const getConversationsChartData = async (clientId?: number): Promise<Conv
         return chartData
     } catch (error) {
         console.error("Error fetching conversations chart:", error)
-        return mockConversationsChart
+        return []
     }
 }
 
+const emptyAppointmentStatus: AppointmentStatusData[] = [
+    { status: "Confirmadas", count: 0, fill: "#22c55e" },
+    { status: "Completadas", count: 0, fill: "#3b82f6" },
+    { status: "Canceladas", count: 0, fill: "#ef4444" },
+    { status: "No Asistió", count: 0, fill: "#f59e0b" },
+]
+
 export const getAppointmentStatusData = async (clientId?: number): Promise<AppointmentStatusData[]> => {
-    if (!clientId) {
-        await new Promise((resolve) => setTimeout(resolve, 500))
-        return mockAppointmentStatus
-    }
+    if (!clientId) return emptyAppointmentStatus
 
     try {
         const appointments = await prisma.appointment.findMany({
@@ -157,15 +163,12 @@ export const getAppointmentStatusData = async (clientId?: number): Promise<Appoi
         ]
     } catch (error) {
         console.error("Error fetching appointment status:", error)
-        return mockAppointmentStatus
+        return emptyAppointmentStatus
     }
 }
 
 export const getHourlyData = async (clientId?: number): Promise<HourlyData[]> => {
-    if (!clientId) {
-        await new Promise((resolve) => setTimeout(resolve, 500))
-        return mockHourlyData
-    }
+    if (!clientId) return []
 
     try {
         const appointments = await prisma.appointment.findMany({
@@ -194,12 +197,29 @@ export const getHourlyData = async (clientId?: number): Promise<HourlyData[]> =>
         return hourlyData
     } catch (error) {
         console.error("Error fetching hourly data:", error)
-        return mockHourlyData
+        return []
     }
 }
 
-export const getRecentCustomers = async () => {
-    await new Promise((resolve) => setTimeout(resolve, 500))
-    // Sort by created_at desc
-    return [...mockCustomers].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()).slice(0, 5)
+export const getRecentCustomers = async (clientId?: number) => {
+    if (!clientId) return []
+    try {
+        const customers = await prisma.customer.findMany({
+            where: { client_id: clientId },
+            select: { id: true, full_name: true, phone_number: true, data: true, created_at: true, client_id: true },
+            orderBy: { created_at: "desc" },
+            take: 5,
+        })
+        return customers.map((c) => ({
+            id: c.id,
+            client_id: c.client_id,
+            phone_number: c.phone_number,
+            full_name: c.full_name,
+            data: (c.data as Record<string, unknown>) ?? {},
+            created_at: c.created_at.toISOString(),
+        }))
+    } catch (error) {
+        console.error("Error fetching recent customers:", error)
+        return []
+    }
 }

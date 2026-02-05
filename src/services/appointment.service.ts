@@ -1,15 +1,7 @@
-import { mockAppointments } from "@/lib/mock-data"
 import { Appointment } from "@/types"
 
-// Versión para Server Components (usa Prisma directamente)
 export const getUpcomingAppointments = async (clientId?: number): Promise<Appointment[]> => {
-    if (!clientId) {
-        await new Promise((resolve) => setTimeout(resolve, 500))
-        return mockAppointments
-            .filter((a) => a.status === "CONFIRMED")
-            .sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime())
-            .slice(0, 4)
-    }
+    if (!clientId) return []
 
     // Si estamos en el servidor (tiene clientId), usar Prisma directamente
     if (typeof window === 'undefined') {
@@ -79,10 +71,7 @@ export const getUpcomingAppointments = async (clientId?: number): Promise<Appoin
 }
 
 export const getAllAppointments = async (clientId?: number): Promise<Appointment[]> => {
-    if (!clientId) {
-        await new Promise((resolve) => setTimeout(resolve, 500))
-        return mockAppointments
-    }
+    if (!clientId) return []
 
     // Si estamos en el servidor (tiene clientId), usar Prisma directamente
     if (typeof window === 'undefined') {

@@ -41,7 +41,6 @@ import {
   FileText,
   ExternalLink,
 } from "lucide-react"
-import { mockClientConfig } from "@/lib/mock-data"
 import { useAuth } from "@/lib/auth-context"
 import { Client } from "@/types"
 import { useToast } from "@/hooks/use-toast"
@@ -300,7 +299,6 @@ export default function BotConfigPage() {
             delivery_duration: toolsConfig.delivery_duration,
           },
         }
-        console.log("[loadConfig] normalizedConfig.tools_config (lo que se pone en estado):", normalizedConfig.tools_config)
         setConfig(normalizedConfig)
       } catch (error) {
         toast({
@@ -308,8 +306,7 @@ export default function BotConfigPage() {
           description: "No se pudo cargar la configuración",
           variant: "destructive",
         })
-        // Fallback a mock en caso de error
-        setConfig(mockClientConfig)
+        setConfig(null)
       } finally {
         setIsLoading(false)
       }
@@ -787,6 +784,34 @@ export default function BotConfigPage() {
                   </div>
                 </div>
               )}
+
+              {/* Configuración general para clínicas: requiere seguro */}
+              {config.tools_config.business_type === "clinic" && (
+                <div className="space-y-4">
+                  <h4 className="font-medium">Configuración para clínicas</h4>
+                  <div className="flex items-center justify-between rounded-lg border border-border p-4">
+                    <div>
+                      <Label htmlFor="requires-insurance" className="font-medium">¿Requiere seguro médico?</Label>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Si está activo, el bot preguntará si el paciente tiene seguro y qué tipo (ARS, privado, etc.).
+                      </p>
+                    </div>
+                    <Switch
+                      id="requires-insurance"
+                      checked={config.tools_config.requires_insurance || false}
+                      onCheckedChange={(checked) =>
+                        setConfig({
+                          ...config,
+                          tools_config: {
+                            ...config.tools_config,
+                            requires_insurance: checked,
+                          },
+                        })
+                      }
+                    />
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
@@ -835,6 +860,9 @@ export default function BotConfigPage() {
                   Este es el prompt que define la personalidad y comportamiento
                   de tu asistente. Puedes usar Markdown para formatear.
                 </p>
+                <div className="rounded-lg border border-amber-200 dark:border-amber-900/50 bg-amber-50 dark:bg-amber-950/30 p-3 text-sm text-amber-800 dark:text-amber-200">
+                  <strong>Prioridad máxima:</strong> Este prompt se incluye al final de las instrucciones del bot. En caso de conflicto, tus instrucciones prevalecen sobre las reglas automáticas (útil para excepciones, ej: &quot;La Dra. X no acepta seguro&quot;).
+                </div>
               </div>
 
               <div className="rounded-lg border border-border p-4 bg-primary/5">
@@ -853,35 +881,6 @@ export default function BotConfigPage() {
 
         {/* Services Tab = Catálogo (lo que el bot ofrece: manual o PDF) */}
         <TabsContent value="services" className="space-y-4">
-          {/* Requires Insurance para clinic */}
-          {config.tools_config.business_type === "clinic" && (
-            <Card>
-              <CardHeader>
-                <CardTitle>Configuración de Seguro</CardTitle>
-                <CardDescription>
-                  Configura si se requiere seguro médico
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="flex items-center justify-between">
-                  <Label>¿Requiere seguro médico?</Label>
-                  <Switch
-                    checked={config.tools_config.requires_insurance || false}
-                    onCheckedChange={(checked) =>
-                      setConfig({
-                        ...config,
-                        tools_config: {
-                          ...config.tools_config,
-                          requires_insurance: checked,
-                        },
-                      })
-                    }
-                  />
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
           {/* Areas para restaurant (nombres: Terraza, Salón principal, VIP) */}
           {config.tools_config.business_type === "restaurant" && (
             <>
@@ -1580,16 +1579,17 @@ export default function BotConfigPage() {
                           )}
                         </div>
 
-                        {/* Para salón: Duración de slot y horarios (opcionales) */}
+                        {/* Para salón: Duración de slot y horario individual (opcionales) */}
                         {config.tools_config.business_type === "salon" && (
                           <>
                             <div className="grid gap-4 md:grid-cols-2">
                               <div className="space-y-2">
-                                <Label className="text-xs">Duración del slot (min)</Label>
+                                <Label className="text-xs">Duración de cita (min)</Label>
                                 <Input
                                   type="number"
+                                  min={5}
                                   placeholder="60"
-                                  value={professional.slot_duration || ""}
+                                  value={professional.slot_duration ?? ""}
                                   onChange={(e) => {
                                     const newProfessionals = [
                                       ...(config.tools_config.professionals || []),
@@ -1607,11 +1607,14 @@ export default function BotConfigPage() {
                                     })
                                   }}
                                 />
+                                <p className="text-xs text-muted-foreground">
+                                  Duración de cada slot en minutos (ej: 60).
+                                </p>
                               </div>
                             </div>
                             <div className="grid gap-4 md:grid-cols-2">
                               <div className="space-y-2">
-                                <Label className="text-xs">Hora de Inicio</Label>
+                                <Label className="text-xs">Horario individual (inicio)</Label>
                                 <Input
                                   type="time"
                                   value={professional.business_hours?.start || ""}
@@ -1637,7 +1640,7 @@ export default function BotConfigPage() {
                                 />
                               </div>
                               <div className="space-y-2">
-                                <Label className="text-xs">Hora de Fin</Label>
+                                <Label className="text-xs">Horario individual (fin)</Label>
                                 <Input
                                   type="time"
                                   value={professional.business_hours?.end || ""}
@@ -1666,58 +1669,72 @@ export default function BotConfigPage() {
                           </>
                         )}
 
-                        {/* Segunda fila: Para clínicas - Precio, Duración, Horarios */}
+                        {/* Segunda fila: Para clínicas - Precio, Duración, Horarios, Días */}
                         {config.tools_config.business_type === "clinic" && (
                           <>
                             <div className="grid gap-4 md:grid-cols-2">
-                              <Input
-                                type="number"
-                                placeholder="Precio de Consulta"
-                                value={professional.consultation_price || ""}
-                                onChange={(e) => {
-                                  const newProfessionals = [
-                                    ...(config.tools_config.professionals || []),
-                                  ]
-                                  newProfessionals[index] = {
-                                    ...professional,
-                                    consultation_price: Number(e.target.value) || undefined,
-                                  }
-                                  setConfig({
-                                    ...config,
-                                    tools_config: {
-                                      ...config.tools_config,
-                                      professionals: newProfessionals,
-                                    },
-                                  })
-                                }}
-                              />
-                              <Input
-                                type="number"
-                                placeholder="Duración del Slot (minutos)"
-                                value={professional.slot_duration || ""}
-                                onChange={(e) => {
-                                  const newProfessionals = [
-                                    ...(config.tools_config.professionals || []),
-                                  ]
-                                  newProfessionals[index] = {
-                                    ...professional,
-                                    slot_duration: Number(e.target.value) || undefined,
-                                  }
-                                  setConfig({
-                                    ...config,
-                                    tools_config: {
-                                      ...config.tools_config,
-                                      professionals: newProfessionals,
-                                    },
-                                  })
-                                }}
-                              />
+                              <div className="space-y-2">
+                                <Label className="text-xs">Precio de consulta</Label>
+                                <Input
+                                  type="number"
+                                  min={0}
+                                  placeholder="1500"
+                                  value={professional.consultation_price ?? ""}
+                                  onChange={(e) => {
+                                    const newProfessionals = [
+                                      ...(config.tools_config.professionals || []),
+                                    ]
+                                    newProfessionals[index] = {
+                                      ...professional,
+                                      consultation_price: Number(e.target.value) || undefined,
+                                    }
+                                    setConfig({
+                                      ...config,
+                                      tools_config: {
+                                        ...config.tools_config,
+                                        professionals: newProfessionals,
+                                      },
+                                    })
+                                  }}
+                                />
+                                <p className="text-xs text-muted-foreground">
+                                  Ej: 1500. El bot mostrará este precio por consulta (ej: RD$1,500 si usas {config.tools_config.currency || "RD$"}).
+                                </p>
+                              </div>
+                              <div className="space-y-2">
+                                <Label className="text-xs">Duración de cita (min)</Label>
+                                <Input
+                                  type="number"
+                                  min={5}
+                                  placeholder="60"
+                                  value={professional.slot_duration ?? ""}
+                                  onChange={(e) => {
+                                    const newProfessionals = [
+                                      ...(config.tools_config.professionals || []),
+                                    ]
+                                    newProfessionals[index] = {
+                                      ...professional,
+                                      slot_duration: Number(e.target.value) || undefined,
+                                    }
+                                    setConfig({
+                                      ...config,
+                                      tools_config: {
+                                        ...config.tools_config,
+                                        professionals: newProfessionals,
+                                      },
+                                    })
+                                  }}
+                                />
+                                <p className="text-xs text-muted-foreground">
+                                  Duración de cada cita en minutos (ej: 60).
+                                </p>
+                              </div>
                             </div>
 
-                            {/* Horarios del profesional */}
+                            {/* Horario individual del profesional */}
                             <div className="grid gap-4 md:grid-cols-2">
                               <div className="space-y-2">
-                                <Label className="text-xs">Hora de Inicio</Label>
+                                <Label className="text-xs">Horario individual (inicio)</Label>
                                 <Input
                                   type="time"
                                   value={professional.business_hours?.start || ""}
@@ -1743,7 +1760,7 @@ export default function BotConfigPage() {
                                 />
                               </div>
                               <div className="space-y-2">
-                                <Label className="text-xs">Hora de Fin</Label>
+                                <Label className="text-xs">Horario individual (fin)</Label>
                                 <Input
                                   type="time"
                                   value={professional.business_hours?.end || ""}
@@ -1770,9 +1787,9 @@ export default function BotConfigPage() {
                               </div>
                             </div>
 
-                            {/* Días de trabajo del profesional */}
+                            {/* Días de trabajo del profesional (ej: Lun, Mar, Vie) */}
                             <div className="space-y-2">
-                              <Label className="text-xs">Días de Trabajo</Label>
+                              <Label className="text-xs">Días de trabajo</Label>
                               <div className="flex flex-wrap gap-2">
                                 {weekdays.map((day) => {
                                   const isSelected = professional.working_days?.includes(day.value) || false

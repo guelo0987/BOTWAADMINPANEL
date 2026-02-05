@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
@@ -38,19 +38,21 @@ import {
   Clock,
   FileText,
 } from "lucide-react"
-import { mockCustomers, mockAppointments, mockConversations } from "@/lib/mock-data"
 import type { Customer, Appointment, Conversation } from "@/types"
+import { useAuth } from "@/lib/auth-context"
 import { format, formatDistanceToNow } from "date-fns"
 import { es } from "date-fns/locale"
 
 function CustomerRow({
   customer,
+  appointments,
   onClick,
 }: {
   customer: Customer
+  appointments: Appointment[]
   onClick: () => void
 }) {
-  const customerAppointments = mockAppointments.filter(
+  const customerAppointments = appointments.filter(
     (apt) => apt.customer_id === customer.id
   )
   const lastAppointment = customerAppointments[0]
@@ -113,10 +115,14 @@ function CustomerRow({
 
 function CustomerDetail({
   customer,
+  appointments,
+  conversations,
   open,
   onClose,
 }: {
   customer: Customer | null
+  appointments: Appointment[]
+  conversations: Conversation[]
   open: boolean
   onClose: () => void
 }) {
@@ -124,10 +130,10 @@ function CustomerDetail({
 
   if (!customer) return null
 
-  const customerAppointments = mockAppointments.filter(
+  const customerAppointments = appointments.filter(
     (apt) => apt.customer_id === customer.id
   )
-  const customerConversations = mockConversations.filter(
+  const customerConversations = conversations.filter(
     (conv) => conv.customer_id === customer.id
   )
 
@@ -381,22 +387,67 @@ function CustomerDetail({
 }
 
 export default function CustomersPage() {
+  const { user } = useAuth()
   const [search, setSearch] = useState("")
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null)
   const [sheetOpen, setSheetOpen] = useState(false)
+  const [customers, setCustomers] = useState<Customer[]>([])
+  const [appointments, setAppointments] = useState<Appointment[]>([])
+  const [conversations, setConversations] = useState<Conversation[]>([])
+  const [isLoading, setIsLoading] = useState(true)
 
-  const filteredCustomers = mockCustomers.filter((customer) => {
+  useEffect(() => {
+    if (!user?.id) {
+      setIsLoading(false)
+      return
+    }
+    const load = async () => {
+      try {
+        const [custRes, aptRes] = await Promise.all([
+          fetch("/api/appointments/customers", { credentials: "include" }),
+          fetch("/api/appointments", { credentials: "include" }),
+        ])
+        if (custRes.ok) {
+          const data = await custRes.json()
+          setCustomers(Array.isArray(data) ? data : [])
+        }
+        if (aptRes.ok) {
+          const data = await aptRes.json()
+          setAppointments(Array.isArray(data) ? data : [])
+        }
+      } catch {
+        setCustomers([])
+        setAppointments([])
+        setConversations([])
+      } finally {
+        setIsLoading(false)
+      }
+    }
+    load()
+  }, [user?.id])
+
+  const filteredCustomers = customers.filter((customer) => {
     const matchesSearch =
       customer.full_name?.toLowerCase().includes(search.toLowerCase()) ||
       customer.phone_number.includes(search) ||
-      customer.data.email?.toLowerCase().includes(search.toLowerCase())
-
+      (typeof customer.data === "object" && customer.data?.email
+        ? String((customer.data as { email?: string }).email).toLowerCase().includes(search.toLowerCase())
+        : false)
     return matchesSearch
   })
 
   const handleSelectCustomer = (customer: Customer) => {
     setSelectedCustomer(customer)
     setSheetOpen(true)
+  }
+
+  if (isLoading) {
+    return (
+      <div className="space-y-6">
+        <h1 className="text-2xl font-bold tracking-tight">Clientes</h1>
+        <p className="text-muted-foreground">Cargando...</p>
+      </div>
+    )
   }
 
   return (
@@ -417,7 +468,7 @@ export default function CustomersPage() {
                 <Users className="h-5 w-5 text-primary" />
               </div>
               <div>
-                <p className="text-2xl font-bold">{mockCustomers.length}</p>
+                <p className="text-2xl font-bold">{customers.length}</p>
                 <p className="text-sm text-muted-foreground">Total clientes</p>
               </div>
             </div>
@@ -431,7 +482,7 @@ export default function CustomersPage() {
               </div>
               <div>
                 <p className="text-2xl font-bold">
-                  {mockAppointments.filter((a) => a.status === "CONFIRMED").length}
+                  {appointments.filter((a) => a.status === "CONFIRMED").length}
                 </p>
                 <p className="text-sm text-muted-foreground">Citas activas</p>
               </div>
@@ -446,7 +497,7 @@ export default function CustomersPage() {
               </div>
               <div>
                 <p className="text-2xl font-bold">
-                  {mockConversations.filter((c) => c.status === "active").length}
+                  {conversations.filter((c) => c.status === "active").length}
                 </p>
                 <p className="text-sm text-muted-foreground">
                   Conversaciones activas
@@ -504,6 +555,7 @@ export default function CustomersPage() {
                   <CustomerRow
                     key={customer.id}
                     customer={customer}
+                    appointments={appointments}
                     onClick={() => handleSelectCustomer(customer)}
                   />
                 ))}
@@ -516,6 +568,8 @@ export default function CustomersPage() {
       {/* Customer Detail Sheet */}
       <CustomerDetail
         customer={selectedCustomer}
+        appointments={appointments}
+        conversations={conversations}
         open={sheetOpen}
         onClose={() => setSheetOpen(false)}
       />

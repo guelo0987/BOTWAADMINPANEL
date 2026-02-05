@@ -1,13 +1,7 @@
-import { mockConversations, mockMessages } from "@/lib/mock-data"
 import { Conversation, Message } from "@/types"
-import prisma from "@/lib/db"
-import { ConversationMemory } from "@/services/redis.service"
 
 export const getRecentConversations = async (clientId?: number): Promise<Conversation[]> => {
-    if (!clientId) {
-        await new Promise((resolve) => setTimeout(resolve, 500))
-        return mockConversations.slice(0, 5)
-    }
+    if (!clientId) return []
 
     try {
         // Obtener conversaciones desde la API de admin
@@ -28,10 +22,7 @@ export const getRecentConversations = async (clientId?: number): Promise<Convers
 }
 
 export const getAllConversations = async (clientId?: number): Promise<Conversation[]> => {
-    if (!clientId) {
-        await new Promise((resolve) => setTimeout(resolve, 500))
-        return mockConversations
-    }
+    if (!clientId) return []
 
     try {
         const response = await fetch(
@@ -51,10 +42,7 @@ export const getAllConversations = async (clientId?: number): Promise<Conversati
 }
 
 export const getConversationMessages = async (conversationId: number, clientId?: number): Promise<Message[]> => {
-    if (!clientId) {
-        await new Promise((resolve) => setTimeout(resolve, 500))
-        return mockMessages.filter(m => m.conversation_id === conversationId)
-    }
+    if (!clientId) return []
 
     try {
         const response = await fetch(

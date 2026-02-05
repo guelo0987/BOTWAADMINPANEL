@@ -1,8 +1,6 @@
 "use client"
 
-import React from "react"
-
-import { useState } from "react"
+import React, { useState, useEffect } from "react"
 import {
   Card,
   CardContent,
@@ -47,12 +45,7 @@ import {
   Clock,
   Bot,
 } from "lucide-react"
-import {
-  mockConversationsChart,
-  mockAppointmentStatus,
-  mockHourlyData,
-  mockDashboardStats,
-} from "@/lib/mock-data"
+import type { DashboardStats, ConversationChartData, AppointmentStatusData, HourlyData } from "@/types"
 
 // Computed colors for Recharts
 const COLORS = {
@@ -136,9 +129,46 @@ function StatCard({
 
 export default function AnalyticsPage() {
   const [timeRange, setTimeRange] = useState("month")
+  const [stats, setStats] = useState<DashboardStats | null>(null)
+  const [conversationsChart, setConversationsChart] = useState<ConversationChartData[]>([])
+  const [appointmentStatus, setAppointmentStatus] = useState<AppointmentStatusData[]>([])
+  const [hourlyData, setHourlyData] = useState<HourlyData[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const res = await fetch("/api/dashboard/stats", { credentials: "include" })
+        if (res.ok) {
+          const data = await res.json()
+          setStats(data.stats ?? null)
+          setConversationsChart(data.conversationsChart ?? [])
+          setAppointmentStatus(data.appointmentStatus ?? [])
+          setHourlyData(data.hourlyData ?? [])
+        }
+      } catch {
+        setStats(null)
+        setConversationsChart([])
+        setAppointmentStatus([])
+        setHourlyData([])
+      } finally {
+        setIsLoading(false)
+      }
+    }
+    load()
+  }, [])
 
   const chartData = timeRange === "week" ? weeklyData : monthlyData
   const xDataKey = timeRange === "week" ? "week" : "month"
+
+  if (isLoading) {
+    return (
+      <div className="space-y-6">
+        <h1 className="text-2xl font-bold tracking-tight">Analíticas</h1>
+        <p className="text-muted-foreground">Cargando...</p>
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-6">
@@ -170,29 +200,29 @@ export default function AnalyticsPage() {
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <StatCard
           title="Total Conversaciones"
-          value="4,892"
-          change={12}
+          value={stats?.conversations_today ?? 0}
+          change={stats?.conversations_change ?? 0}
           trend="up"
           icon={MessageSquare}
         />
         <StatCard
           title="Citas Agendadas"
-          value="689"
-          change={8}
+          value={stats?.appointments_today ?? 0}
+          change={stats?.appointments_change ?? 0}
           trend="up"
           icon={Calendar}
         />
         <StatCard
           title="Nuevos Clientes"
-          value="298"
-          change={15}
+          value={stats?.customers_new ?? 0}
+          change={0}
           trend="up"
           icon={Users}
         />
         <StatCard
           title="Tiempo de Respuesta"
-          value="2.8s"
-          change={5}
+          value={`${stats?.response_rate ?? 0}%`}
+          change={0}
           trend="down"
           icon={Clock}
         />
@@ -284,7 +314,7 @@ export default function AnalyticsPage() {
               className="h-[300px] w-full"
             >
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={mockHourlyData} margin={{ left: 0, right: 0 }}>
+                <BarChart data={hourlyData} margin={{ left: 0, right: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
                   <XAxis
                     dataKey="hour"

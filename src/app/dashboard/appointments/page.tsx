@@ -42,7 +42,6 @@ import {
   List,
   LayoutGrid,
 } from "lucide-react"
-import { mockAppointments, mockCustomers } from "@/lib/mock-data"
 import type { Appointment } from "@/types"
 import { getAllAppointments } from "@/services/appointment.service"
 import { format, isSameDay, startOfMonth, endOfMonth, eachDayOfInterval, isToday, isSameMonth } from "date-fns"
@@ -503,8 +502,7 @@ export default function AppointmentsPage() {
         setAppointments(data)
       } catch (error) {
         console.error("Error loading appointments:", error)
-        // Fallback a mock data en caso de error
-        setAppointments(mockAppointments)
+        setAppointments([])
       } finally {
         setIsLoading(false)
       }

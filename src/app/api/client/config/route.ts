@@ -35,14 +35,10 @@ export async function GET(req: Request) {
             )
         }
 
-        console.log("[GET /api/client/config] tools_config desde BD (crudo):", JSON.stringify(client.tools_config, null, 2))
-
         // Asegurar que tools_config sea un objeto, no null
-        const toolsConfig = client.tools_config && typeof client.tools_config === 'object' 
-            ? client.tools_config 
+        const toolsConfig = client.tools_config && typeof client.tools_config === 'object'
+            ? client.tools_config
             : (client.tools_config ? JSON.parse(client.tools_config as string) : {})
-
-        console.log("[GET /api/client/config] tools_config que se envía al frontend:", JSON.stringify(toolsConfig, null, 2))
 
         return NextResponse.json({
             ...client,
