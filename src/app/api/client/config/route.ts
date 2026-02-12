@@ -25,6 +25,9 @@ export async function GET(req: Request) {
                 system_prompt_template: true,
                 tools_config: true,
                 created_at: true,
+                whatsapp_access_token: true,
+                whatsapp_app_secret: true,
+                whatsapp_api_version: true,
             },
         })
 
@@ -64,6 +67,9 @@ export async function PUT(req: Request) {
             is_active,
             system_prompt_template,
             tools_config,
+            whatsapp_access_token,
+            whatsapp_app_secret,
+            whatsapp_api_version,
         } = body
 
         if (!client_id) {
@@ -117,7 +123,7 @@ export async function PUT(req: Request) {
             normalizedToolsConfig = normalizeToolsConfig(tools_config)
         }
 
-        // Actualizar cliente
+        // Actualizar cliente (whatsapp_* opcionales: permitir string o null para actualizar/limpiar)
         const updatedClient = await prisma.client.update({
             where: { id: parseInt(client_id) },
             data: {
@@ -126,6 +132,9 @@ export async function PUT(req: Request) {
                 ...(typeof is_active === "boolean" && { is_active }),
                 ...(system_prompt_template && { system_prompt_template }),
                 ...(normalizedToolsConfig && { tools_config: normalizedToolsConfig }),
+                ...(whatsapp_access_token !== undefined && { whatsapp_access_token: whatsapp_access_token || null }),
+                ...(whatsapp_app_secret !== undefined && { whatsapp_app_secret: whatsapp_app_secret || null }),
+                ...(whatsapp_api_version !== undefined && { whatsapp_api_version: whatsapp_api_version || null }),
             },
             select: {
                 id: true,
@@ -135,6 +144,9 @@ export async function PUT(req: Request) {
                 system_prompt_template: true,
                 tools_config: true,
                 created_at: true,
+                whatsapp_access_token: true,
+                whatsapp_app_secret: true,
+                whatsapp_api_version: true,
             },
         })
 

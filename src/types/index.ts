@@ -8,6 +8,12 @@ export interface Client {
   system_prompt_template: string
   tools_config: ToolsConfig
   created_at: string
+  /** Multi-tenant: token de acceso a WhatsApp Cloud API (por cliente) */
+  whatsapp_access_token?: string | null
+  /** Multi-tenant: app secret para verificación de firma (por cliente) */
+  whatsapp_app_secret?: string | null
+  /** Multi-tenant: versión de la API (ej: v21.0) */
+  whatsapp_api_version?: string | null
 }
 
 /**

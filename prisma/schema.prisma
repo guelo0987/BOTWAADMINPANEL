@@ -41,6 +41,11 @@ model Client {
   tools_config           Json?    @default("{}")
   created_at             DateTime @default(now())
 
+  // Multi-tenant WhatsApp (per-client credentials)
+  whatsapp_access_token  String?
+  whatsapp_app_secret    String?
+  whatsapp_api_version   String?  @default("v21.0")
+
   // Relations
   customers    Customer[]
   appointments Appointment[]

@@ -265,6 +265,9 @@ export default function BotConfigPage() {
 
         const normalizedConfig: Client = {
           ...data,
+          whatsapp_access_token: data.whatsapp_access_token ?? null,
+          whatsapp_app_secret: data.whatsapp_app_secret ?? null,
+          whatsapp_api_version: data.whatsapp_api_version ?? "v21.0",
           tools_config: {
             ...toolsConfig,
             business_type: toolsConfig.business_type || "general",
@@ -334,6 +337,9 @@ export default function BotConfigPage() {
           is_active: latest.is_active,
           system_prompt_template: latest.system_prompt_template,
           tools_config: latest.tools_config,
+          whatsapp_access_token: latest.whatsapp_access_token ?? null,
+          whatsapp_app_secret: latest.whatsapp_app_secret ?? null,
+          whatsapp_api_version: latest.whatsapp_api_version ?? null,
         }),
       })
 
@@ -527,6 +533,84 @@ export default function BotConfigPage() {
                   </p>
                 </div>
               </div>
+
+              <Separator />
+
+              <div className="space-y-4">
+                <h4 className="font-medium">Conexión WhatsApp (multi-tenant)</h4>
+                <p className="text-sm text-muted-foreground">
+                  Credenciales de tu app en Meta. El bot usa estas credenciales por cliente.
+                </p>
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="whatsapp-access-token">Access Token</Label>
+                    <Input
+                      id="whatsapp-access-token"
+                      type="password"
+                      autoComplete="off"
+                      value={config.whatsapp_access_token ?? ""}
+                      onChange={(e) =>
+                        setConfig({
+                          ...config,
+                          whatsapp_access_token: e.target.value || null,
+                        })
+                      }
+                      placeholder="EAAxxxx..."
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Token de acceso permanente desde Meta for Developers
+                    </p>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="whatsapp-app-secret">App Secret</Label>
+                    <Input
+                      id="whatsapp-app-secret"
+                      type="password"
+                      autoComplete="off"
+                      value={config.whatsapp_app_secret ?? ""}
+                      onChange={(e) =>
+                        setConfig({
+                          ...config,
+                          whatsapp_app_secret: e.target.value || null,
+                        })
+                      }
+                      placeholder="••••••••"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      App Secret (verificación de firma del webhook)
+                    </p>
+                  </div>
+                </div>
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="whatsapp-api-version">Versión de API</Label>
+                    <Select
+                      value={config.whatsapp_api_version ?? "v21.0"}
+                      onValueChange={(value) =>
+                        setConfig({
+                          ...config,
+                          whatsapp_api_version: value,
+                        })
+                      }
+                    >
+                      <SelectTrigger id="whatsapp-api-version">
+                        <SelectValue placeholder="v21.0" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="v21.0">v21.0</SelectItem>
+                        <SelectItem value="v22.0">v22.0</SelectItem>
+                        <SelectItem value="v23.0">v23.0</SelectItem>
+                        <SelectItem value="v24.0">v24.0</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-muted-foreground">
+                      Versión de WhatsApp Cloud API (por defecto v21.0)
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <Separator />
 
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="space-y-2">
@@ -1666,6 +1750,49 @@ export default function BotConfigPage() {
                                 />
                               </div>
                             </div>
+                            {/* Días de trabajo del profesional (salon) */}
+                            <div className="space-y-2">
+                              <Label className="text-xs">Días de trabajo</Label>
+                              <div className="flex flex-wrap gap-2">
+                                {weekdays.map((day) => {
+                                  const isSelected = professional.working_days?.includes(day.value) || false
+                                  return (
+                                    <Button
+                                      key={day.value}
+                                      type="button"
+                                      variant={isSelected ? "default" : "outline"}
+                                      size="sm"
+                                      className="h-8"
+                                      onClick={() => {
+                                        const newProfessionals = [
+                                          ...(config.tools_config.professionals || []),
+                                        ]
+                                        const currentDays = professional.working_days || []
+                                        const newDays = isSelected
+                                          ? currentDays.filter((d) => d !== day.value)
+                                          : [...currentDays, day.value].sort()
+                                        newProfessionals[index] = {
+                                          ...professional,
+                                          working_days: newDays,
+                                        }
+                                        setConfig({
+                                          ...config,
+                                          tools_config: {
+                                            ...config.tools_config,
+                                            professionals: newProfessionals,
+                                          },
+                                        })
+                                      }}
+                                    >
+                                      {day.label.slice(0, 3)}
+                                    </Button>
+                                  )
+                                })}
+                              </div>
+                              <p className="text-xs text-muted-foreground">
+                                Días en que este profesional atiende (ej: Lun, Mar, Vie).
+                              </p>
+                            </div>
                           </>
                         )}
 
@@ -1887,6 +2014,7 @@ export default function BotConfigPage() {
                       start: "08:00",
                       end: "17:00",
                     }
+                    baseProfessional.working_days = []
                   }
 
                   const newProfessionals: Prof[] = [
