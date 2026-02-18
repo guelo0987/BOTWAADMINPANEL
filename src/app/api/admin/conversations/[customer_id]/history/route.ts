@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import prisma from "@/lib/db"
+import { getServerUser } from "@/lib/auth-server"
 import { ConversationMemory } from "@/services/redis.service"
 
 export async function GET(
@@ -7,6 +8,11 @@ export async function GET(
     { params }: { params: Promise<{ customer_id: string }> }
 ) {
     try {
+        const user = await getServerUser()
+        if (!user) {
+            return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+        }
+
         const { searchParams } = new URL(req.url)
         const client_id = searchParams.get("client_id")
         const { customer_id } = await params
@@ -18,24 +24,15 @@ export async function GET(
             )
         }
 
-        // In Next.js 13+, params are sometimes awaited or passed directly. 
-        // Assuming standard directory structure [customer_id]/history/route.ts
-        // We need to parse customer_id from URL if context param binding fails in some edge cases, 
-        // but usually it works fine.
-
-        // Note: The file path created via tool was `src/app/api/admin/conversations/id/history` due to shell expansion limits?
-        // Wait, the previous `mkdir` used `id` literal instead of `[customer_id]`.
-        // I will assume the file path is correct in the `write_to_file` target. 
-        // The user's system likely needs the directory to be named `[customer_id]`.
-
-        // Correcting logic: The previous shell command created `src/app/api/admin/conversations/id/...`. 
-        // I should probably fix the directory name to `[customer_id]` if possible, but I'll write to `[customer_id]` path now 
-        // and let `write_to_file` create the dir.
+        const clientIdNum = parseInt(client_id, 10)
+        if (clientIdNum !== user.id) {
+            return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+        }
 
         const customer = await prisma.customer.findFirst({
             where: {
-                id: parseInt(customer_id),
-                client_id: parseInt(client_id),
+                id: parseInt(customer_id, 10),
+                client_id: clientIdNum,
             },
         })
 
@@ -46,7 +43,7 @@ export async function GET(
             )
         }
 
-        const memory = new ConversationMemory(client_id, customer.phone_number)
+        const memory = new ConversationMemory(clientIdNum, customer.phone_number)
         const history = await memory.getHistory()
         const statusInfo = await memory.getStatus()
 

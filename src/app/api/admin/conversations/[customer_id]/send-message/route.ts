@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import prisma from "@/lib/db"
+import { getServerUser } from "@/lib/auth-server"
 import { ConversationMemory } from "@/services/redis.service"
 import { sendWhatsAppMessage } from "@/services/whatsapp.service"
 
@@ -8,6 +9,11 @@ export async function POST(
     { params }: { params: Promise<{ customer_id: string }> }
 ) {
     try {
+        const user = await getServerUser()
+        if (!user) {
+            return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+        }
+
         const body = await req.json()
         const { client_id, message, admin_name = "Agente" } = body
         const { customer_id } = await params
@@ -19,10 +25,15 @@ export async function POST(
             )
         }
 
+        const clientIdNum = parseInt(client_id, 10)
+        if (clientIdNum !== user.id) {
+            return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+        }
+
         const customer = await prisma.customer.findFirst({
             where: {
-                id: parseInt(customer_id),
-                client_id: parseInt(client_id),
+                id: parseInt(customer_id, 10),
+                client_id: clientIdNum,
             },
         })
 
@@ -39,7 +50,7 @@ export async function POST(
         // ⚠️ ENVIAR A WHATSAPP PRIMERO
         let whatsappResponse
         try {
-            whatsappResponse = await sendWhatsAppMessage(cleanPhone, message, client_id)
+            whatsappResponse = await sendWhatsAppMessage(cleanPhone, message, clientIdNum)
             
             // Verificar que realmente se envió
             if (!whatsappResponse.messages?.[0]?.id) {
@@ -47,7 +58,6 @@ export async function POST(
             }
         } catch (whatsappError: any) {
             // ⚠️ ERROR AL ENVIAR A WHATSAPP - NO ACTUALIZAR REDIS
-            console.error("❌ Error enviando a WhatsApp:", whatsappError)
             return NextResponse.json(
                 {
                     error: "Error enviando mensaje a WhatsApp",
@@ -61,18 +71,15 @@ export async function POST(
         const messageId = whatsappResponse.messages[0].id
 
         try {
-            const memory = new ConversationMemory(client_id, cleanPhone)
+            const memory = new ConversationMemory(clientIdNum, cleanPhone)
             
             // Marcar como manejada por humano
             await memory.setHumanHandled(true, admin_name)
             
             // Guardar mensaje en historial
             await memory.addHumanMessage(message, admin_name)
-            
-            console.log("✅ Redis actualizado correctamente")
         } catch (redisError) {
             // ⚠️ ERROR EN REDIS PERO MENSAJE YA ENVIADO A WHATSAPP
-            console.error("⚠️ Error actualizando Redis (mensaje ya enviado):", redisError)
             // No fallar porque el mensaje ya se envió, pero informar
         }
 

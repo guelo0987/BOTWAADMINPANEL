@@ -1,6 +1,7 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
+import { useSearchParams } from "next/navigation"
 import { useAuth } from "@/lib/auth-context"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -33,16 +34,15 @@ import {
   User,
 } from "lucide-react"
 import type { Conversation, Message } from "@/types"
-import { getAllConversations } from "@/services/conversation.service"
 import { useToast } from "@/hooks/use-toast"
 import { formatDistanceToNow, format } from "date-fns"
 import { es } from "date-fns/locale"
 
 const statusConfig = {
   active: {
-    label: "Activa",
+    label: "IA respondiendo",
     color: "bg-green-500/10 text-green-600 border-green-500/20",
-    icon: Clock,
+    icon: Bot,
   },
   resolved: {
     label: "Resuelta",
@@ -55,7 +55,7 @@ const statusConfig = {
     icon: AlertTriangle,
   },
   human_handled: {
-    label: "Manejada por Humano",
+    label: "Tú respondiendo",
     color: "bg-blue-500/10 text-blue-600 border-blue-500/20",
     icon: User,
   },
@@ -332,10 +332,49 @@ function ConversationDetail({
     }
   }
 
+  const handleTakeConversation = async () => {
+    if (!conversation?.customer_id || !clientId) return
+
+    try {
+      const response = await fetch(
+        `/api/admin/conversations/${conversation.customer_id}/take`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            client_id: clientId,
+            admin_name: "Agente",
+          }),
+        }
+      )
+
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.error || "Failed to take conversation")
+      }
+
+      setConversationStatus("human_handled")
+      onRefresh?.()
+
+      toast({
+        title: "Conversación tomada",
+        description: "La IA está pausada. Escribe y envía tu mensaje.",
+      })
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "No se pudo tomar la conversación",
+        variant: "destructive",
+      })
+    }
+  }
+
   const handleResolve = async () => {
     if (!conversation?.customer_id || !clientId) return
 
-    const resumeAI = confirm("¿Deseas reanudar la IA? (Si cancelas, solo se marcará como resuelta)")
+    const resumeAI = confirm(
+      "¿Reanudar la IA para que responda automáticamente? (Cancelar = solo marcar como resuelta)"
+    )
 
     try {
       const response = await fetch(
@@ -441,7 +480,18 @@ function ConversationDetail({
             </div>
           )}
 
-          <div className="flex items-center gap-2 mb-3">
+          <div className="flex flex-wrap items-center gap-2 mb-3">
+            {conversationStatus === "active" && (
+              <Button
+                variant="default"
+                size="sm"
+                onClick={handleTakeConversation}
+                className="bg-blue-600 hover:bg-blue-700"
+              >
+                <User className="h-4 w-4 mr-1" />
+                Tomar conversación
+              </Button>
+            )}
             <Button
               variant="outline"
               size="sm"
@@ -452,13 +502,15 @@ function ConversationDetail({
               <AlertTriangle className="h-4 w-4 mr-1" />
               Escalar
             </Button>
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               size="sm"
               onClick={handleResolve}
             >
               <CheckCircle className="h-4 w-4 mr-1" />
-              Resolver
+              {conversationStatus === "human_handled" || conversationStatus === "escalated"
+                ? "Resolver / Reanudar IA"
+                : "Resolver"}
             </Button>
           </div>
           <div className="flex gap-2">
@@ -491,6 +543,7 @@ function ConversationDetail({
 
 export default function ConversationsPage() {
   const { user } = useAuth()
+  const searchParams = useSearchParams()
   const { toast } = useToast()
   const [search, setSearch] = useState("")
   const [statusFilter, setStatusFilter] = useState<string>("all")
@@ -499,12 +552,26 @@ export default function ConversationsPage() {
   const [sheetOpen, setSheetOpen] = useState(false)
   const [conversations, setConversations] = useState<Conversation[]>([])
   const [isLoading, setIsLoading] = useState(true)
-  const [stats, setStats] = useState({ active: 0, escalated: 0, resolved: 0 })
+  const [stats, setStats] = useState({ active: 0, human_handled: 0, escalated: 0, resolved: 0 })
+  const openCustomerIdRef = useRef<string | null>(null)
 
   // Cargar conversaciones
   useEffect(() => {
     loadConversations()
   }, [user?.id, statusFilter])
+
+  // Abrir conversación desde ?open=customer_id (ej: desde Clientes)
+  useEffect(() => {
+    const openId = searchParams.get("open")
+    if (openId && conversations.length > 0 && !openCustomerIdRef.current) {
+      openCustomerIdRef.current = openId
+      const conv = conversations.find((c) => c.customer_id === parseInt(openId))
+      if (conv) {
+        setSelectedConversation(conv)
+        setSheetOpen(true)
+      }
+    }
+  }, [searchParams, conversations])
 
   const loadConversations = async () => {
     if (!user?.id) return
@@ -538,6 +605,7 @@ export default function ConversationsPage() {
       setConversations(formattedConversations)
       setStats({
         active: data.active || 0,
+        human_handled: data.human_handled || 0,
         escalated: data.escalated || 0,
         resolved: data.resolved || 0,
       })
@@ -592,9 +660,9 @@ export default function ConversationsPage() {
             <SelectValue placeholder="Filtrar por estado" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">Todos los estados</SelectItem>
-            <SelectItem value="active">Activas</SelectItem>
-            <SelectItem value="human_handled">Manejadas por Humano</SelectItem>
+            <SelectItem value="all">Todos</SelectItem>
+            <SelectItem value="active">IA respondiendo</SelectItem>
+            <SelectItem value="human_handled">Tú respondiendo</SelectItem>
             <SelectItem value="escalated">Escaladas</SelectItem>
             <SelectItem value="resolved">Resueltas</SelectItem>
           </SelectContent>
@@ -602,16 +670,29 @@ export default function ConversationsPage() {
       </div>
 
       {/* Stats */}
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center gap-3">
               <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-success/10">
-                <Clock className="h-5 w-5 text-success" />
+                <Bot className="h-5 w-5 text-success" />
               </div>
               <div>
                 <p className="text-2xl font-bold">{stats.active}</p>
-                <p className="text-sm text-muted-foreground">Activas</p>
+                <p className="text-sm text-muted-foreground">IA respondiendo</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-500/10">
+                <User className="h-5 w-5 text-blue-600" />
+              </div>
+              <div>
+                <p className="text-2xl font-bold">{stats.human_handled}</p>
+                <p className="text-sm text-muted-foreground">Tú respondiendo</p>
               </div>
             </div>
           </CardContent>

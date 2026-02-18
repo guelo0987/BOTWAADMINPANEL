@@ -200,9 +200,6 @@ export default function BotConfigPage() {
 
         const data = await response.json()
 
-        console.log("[loadConfig] Respuesta API (data):", data)
-        console.log("[loadConfig] data.tools_config (crudo):", data.tools_config)
-
         // Parsear tools_config si viene como string o asegurar que sea objeto
         let toolsConfig = data.tools_config
         if (typeof toolsConfig === 'string') {
@@ -215,9 +212,6 @@ export default function BotConfigPage() {
         if (!toolsConfig || typeof toolsConfig !== 'object') {
           toolsConfig = {}
         }
-
-        console.log("[loadConfig] toolsConfig parseado:", toolsConfig)
-        console.log("[loadConfig] BD catalog_source:", toolsConfig.catalog_source, "| catalog_pdf_key:", toolsConfig.catalog_pdf_key, "| catalog:", toolsConfig.catalog, "| services:", toolsConfig.services)
 
         // Traer de BD: los dos pueden existir; el usuario elige con el radio cuál usa el bot (y Guardar persiste esa elección).
         const catalogPdfKeyFromDb =
@@ -255,13 +249,6 @@ export default function BotConfigPage() {
                   },
                 ]
               : []
-
-        console.log("[loadConfig] derivado:", {
-          catalogPdfKeyFromDb,
-          catalogSourceFromDb,
-          catalogSource,
-          catalogCategoriesLength: catalogCategories.length,
-        })
 
         const normalizedConfig: Client = {
           ...data,

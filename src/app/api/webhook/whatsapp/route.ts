@@ -81,7 +81,6 @@ async function detectBusinessSuiteMessage(
 
         if (!isOurs) {
             // Mensaje enviado desde Business Suite (no está en sent_messages)
-            console.log(`🔍 Detectado mensaje desde Business Suite: ${recipientId}`)
             await memory.setHumanHandled(true, "Meta Business Suite")
         }
     } catch (error) {

@@ -47,6 +47,8 @@ export const getDashboardStats = async (clientId?: number): Promise<DashboardSta
         today.setHours(0, 0, 0, 0)
         const tomorrow = new Date(today)
         tomorrow.setDate(tomorrow.getDate() + 1)
+        const weekAgo = new Date(today)
+        weekAgo.setDate(weekAgo.getDate() - 7)
 
         const appointmentsToday = appointments.filter(
             (apt) =>
@@ -58,18 +60,22 @@ export const getDashboardStats = async (clientId?: number): Promise<DashboardSta
             (apt) => apt.status === "CONFIRMED"
         ).length
 
-        // Calcular tasa de respuesta (mock por ahora)
-        const responseRate = 98.5
+        const customersNewThisWeek = await prisma.customer.count({
+            where: {
+                client_id: clientId,
+                created_at: { gte: weekAgo },
+            },
+        })
 
         return {
             conversations_today: activeConversations,
-            conversations_change: 12, // TODO: Calcular cambio real
+            conversations_change: 0,
             appointments_today: appointmentsToday,
-            appointments_change: 8, // TODO: Calcular cambio real
+            appointments_change: 0,
             pending_appointments: pendingAppointments,
-            response_rate: responseRate,
+            response_rate: 98.5,
             customers_total: customers,
-            customers_new: 5, // TODO: Calcular nuevos esta semana
+            customers_new: customersNewThisWeek,
         }
     } catch (error) {
         console.error("Error fetching dashboard stats:", error)

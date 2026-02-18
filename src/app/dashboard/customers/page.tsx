@@ -25,6 +25,7 @@ import {
 } from "@/components/ui/table"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
+import Link from "next/link"
 import {
   Search,
   Users,
@@ -84,8 +85,8 @@ function CustomerRow({
         </div>
       </TableCell>
       <TableCell>
-        {customer.data.email ? (
-          <span className="text-sm">{customer.data.email}</span>
+        {(customer.data as Record<string, unknown>)?.email ? (
+          <span className="text-sm">{(customer.data as Record<string, unknown>).email as string}</span>
         ) : (
           <span className="text-sm text-muted-foreground">-</span>
         )}
@@ -119,12 +120,14 @@ function CustomerDetail({
   conversations,
   open,
   onClose,
+  clientId,
 }: {
   customer: Customer | null
   appointments: Appointment[]
   conversations: Conversation[]
   open: boolean
   onClose: () => void
+  clientId?: number
 }) {
   const [isEditing, setIsEditing] = useState(false)
 
@@ -176,14 +179,24 @@ function CustomerDetail({
                 +{customer.phone_number}
               </SheetDescription>
             </div>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setIsEditing(!isEditing)}
-            >
-              <Edit className="h-4 w-4 mr-1" />
-              {isEditing ? "Cancelar" : "Editar"}
-            </Button>
+            <div className="flex gap-2">
+              {customerConversations.length > 0 && clientId && (
+                <Link href={`/dashboard/conversations?open=${customer.id}`}>
+                  <Button variant="outline" size="sm">
+                    <MessageSquare className="h-4 w-4 mr-1" />
+                    Ver conversación
+                  </Button>
+                </Link>
+              )}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setIsEditing(!isEditing)}
+              >
+                <Edit className="h-4 w-4 mr-1" />
+                {isEditing ? "Cancelar" : "Editar"}
+              </Button>
+            </div>
           </div>
         </SheetHeader>
 
@@ -220,24 +233,24 @@ function CustomerDetail({
                 <div className="space-y-2">
                   <Label className="text-muted-foreground">Email</Label>
                   {isEditing ? (
-                    <Input defaultValue={customer.data.email || ""} />
+                    <Input defaultValue={String((customer.data as Record<string, unknown>)?.email || "")} />
                   ) : (
                     <p className="font-medium flex items-center gap-2">
                       <Mail className="h-4 w-4 text-muted-foreground" />
-                      {customer.data.email || "No registrado"}
+                      {(customer.data as Record<string, unknown>)?.email || "No registrado"}
                     </p>
                   )}
                 </div>
 
-                {customer.data.address && (
+                {((customer.data as Record<string, unknown>)?.direccion || (customer.data as Record<string, unknown>)?.address) && (
                   <div className="space-y-2">
                     <Label className="text-muted-foreground">Dirección</Label>
                     {isEditing ? (
-                      <Textarea defaultValue={customer.data.address} />
+                      <Textarea defaultValue={String((customer.data as Record<string, unknown>).direccion || (customer.data as Record<string, unknown>).address || "")} />
                     ) : (
                       <p className="font-medium flex items-center gap-2">
                         <MapPin className="h-4 w-4 text-muted-foreground" />
-                        {customer.data.address}
+                        {(customer.data as Record<string, unknown>).direccion || (customer.data as Record<string, unknown>).address}
                       </p>
                     )}
                   </div>
@@ -317,7 +330,10 @@ function CustomerDetail({
                 <div className="flex flex-col items-center justify-center py-8 text-center">
                   <MessageSquare className="h-12 w-12 text-muted-foreground/50 mb-4" />
                   <p className="text-sm text-muted-foreground">
-                    Este cliente no tiene conversaciones registradas
+                    Este cliente no tiene conversaciones en WhatsApp aún
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-2">
+                    Las conversaciones aparecen cuando el cliente escribe por WhatsApp
                   </p>
                 </div>
               ) : (
@@ -330,10 +346,12 @@ function CustomerDetail({
                       <div className="flex items-center justify-between mb-2">
                         <Badge variant="outline">
                           {conv.status === "active"
-                            ? "Activa"
-                            : conv.status === "resolved"
-                              ? "Resuelta"
-                              : "Escalada"}
+                            ? "IA respondiendo"
+                            : conv.status === "human_handled"
+                              ? "Tú respondiendo"
+                              : conv.status === "escalated"
+                                ? "Escalada"
+                                : "Resuelta"}
                         </Badge>
                         <span className="text-xs text-muted-foreground">
                           {conv.last_message_at
@@ -403,9 +421,10 @@ export default function CustomersPage() {
     }
     const load = async () => {
       try {
-        const [custRes, aptRes] = await Promise.all([
+        const [custRes, aptRes, convRes] = await Promise.all([
           fetch("/api/appointments/customers", { credentials: "include" }),
           fetch("/api/appointments", { credentials: "include" }),
+          fetch(`/api/admin/conversations?client_id=${user.id}`, { credentials: "include" }),
         ])
         if (custRes.ok) {
           const data = await custRes.json()
@@ -414,6 +433,22 @@ export default function CustomersPage() {
         if (aptRes.ok) {
           const data = await aptRes.json()
           setAppointments(Array.isArray(data) ? data : [])
+        }
+        if (convRes.ok) {
+          const data = await convRes.json()
+          const convs: Conversation[] = (data.conversations || []).map((c: any) => ({
+            id: c.customer_id,
+            customer_id: c.customer_id,
+            phone_number: c.phone_number,
+            customer_name: c.customer_name,
+            last_message: c.last_message,
+            last_message_at: c.last_message_time,
+            status: c.status,
+            message_count: c.message_count,
+            is_escalated: c.is_escalated,
+            is_human_handled: c.is_human_handled,
+          }))
+          setConversations(convs)
         }
       } catch {
         setCustomers([])
@@ -572,6 +607,7 @@ export default function CustomersPage() {
         conversations={conversations}
         open={sheetOpen}
         onClose={() => setSheetOpen(false)}
+        clientId={user?.id}
       />
     </div>
   )

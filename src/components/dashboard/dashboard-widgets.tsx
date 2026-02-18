@@ -261,23 +261,32 @@ export function RecentConversations({ conversations }: { conversations: Conversa
     }
 
     const statusLabels = {
-        active: "Activa",
+        active: "IA respondiendo",
         resolved: "Resuelta",
         escalated: "Escalada",
-        human_handled: "Atendida",
+        human_handled: "Tú respondiendo",
     }
 
     return (
         <Card className="col-span-full lg:col-span-2">
-            <CardHeader>
-                <CardTitle>Conversaciones Recientes</CardTitle>
-                <CardDescription>Últimas interacciones con clientes</CardDescription>
+            <CardHeader className="flex flex-row items-center justify-between">
+                <div>
+                    <CardTitle>Conversaciones Recientes</CardTitle>
+                    <CardDescription>Últimas interacciones con clientes</CardDescription>
+                </div>
+                <a
+                    href="/dashboard/conversations"
+                    className="text-sm font-medium text-primary hover:underline"
+                >
+                    Ver todas →
+                </a>
             </CardHeader>
             <CardContent>
                 <div className="space-y-4">
                     {conversations.map((conversation) => (
-                        <div
-                            key={conversation.id}
+                        <a
+                            key={conversation.customer_id ?? conversation.id ?? Math.random()}
+                            href={`/dashboard/conversations?open=${conversation.customer_id}`}
                             className="flex items-center gap-4 p-3 rounded-lg border border-border hover:bg-muted/50 transition-colors"
                         >
                             <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-primary font-semibold text-sm">
@@ -315,7 +324,7 @@ export function RecentConversations({ conversations }: { conversations: Conversa
                                     "Sin mensajes"
                                 )}
                             </div>
-                        </div>
+                        </a>
                     ))}
                 </div>
             </CardContent>
@@ -340,9 +349,17 @@ export function UpcomingAppointments({ appointments }: { appointments: Appointme
 
     return (
         <Card>
-            <CardHeader>
-                <CardTitle>Próximas Citas</CardTitle>
-                <CardDescription>Citas programadas</CardDescription>
+            <CardHeader className="flex flex-row items-center justify-between">
+                <div>
+                    <CardTitle>Próximas Citas</CardTitle>
+                    <CardDescription>Citas programadas</CardDescription>
+                </div>
+                <a
+                    href="/dashboard/appointments"
+                    className="text-sm font-medium text-primary hover:underline"
+                >
+                    Ver todas →
+                </a>
             </CardHeader>
             <CardContent>
                 <div className="space-y-4">

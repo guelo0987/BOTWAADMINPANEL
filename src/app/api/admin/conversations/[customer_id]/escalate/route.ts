@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import prisma from "@/lib/db"
+import { getServerUser } from "@/lib/auth-server"
 import { ConversationMemory } from "@/services/redis.service"
 
 export async function POST(
@@ -7,14 +8,28 @@ export async function POST(
     { params }: { params: Promise<{ customer_id: string }> }
 ) {
     try {
+        const user = await getServerUser()
+        if (!user) {
+            return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+        }
+
         const body = await req.json()
         const { client_id, motivo } = body
         const { customer_id } = await params
 
+        if (!client_id) {
+            return NextResponse.json({ error: "client_id is required" }, { status: 400 })
+        }
+
+        const clientIdNum = parseInt(client_id, 10)
+        if (clientIdNum !== user.id) {
+            return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+        }
+
         const customer = await prisma.customer.findFirst({
             where: {
-                id: parseInt(customer_id),
-                client_id: parseInt(client_id),
+                id: parseInt(customer_id, 10),
+                client_id: clientIdNum,
             },
         })
 
@@ -25,7 +40,7 @@ export async function POST(
             )
         }
 
-        const memory = new ConversationMemory(client_id, customer.phone_number)
+        const memory = new ConversationMemory(clientIdNum, customer.phone_number)
         await memory.setEscalated(
             true,
             motivo || "Escalado manualmente desde panel admin"

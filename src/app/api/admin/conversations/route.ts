@@ -1,9 +1,15 @@
 import { NextResponse } from "next/server"
 import prisma from "@/lib/db"
+import { getServerUser } from "@/lib/auth-server"
 import { ConversationMemory } from "@/services/redis.service"
 
 export async function GET(req: Request) {
     try {
+        const user = await getServerUser()
+        if (!user) {
+            return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+        }
+
         const { searchParams } = new URL(req.url)
         const client_id = searchParams.get("client_id")
         const status_filter = searchParams.get("status_filter")
@@ -15,27 +21,30 @@ export async function GET(req: Request) {
             )
         }
 
+        const clientIdNum = parseInt(client_id, 10)
+        if (clientIdNum !== user.id) {
+            return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+        }
+
         // 1. Obtener todos los customers del cliente desde DB
         const customers = await prisma.customer.findMany({
-            where: { client_id: parseInt(client_id) },
+            where: { client_id: clientIdNum },
             orderBy: { created_at: "desc" }, // En app real, ordenar por último mensaje
         })
 
         const conversations = []
         let activeCount = 0,
+            humanHandledCount = 0,
             escalatedCount = 0,
             resolvedCount = 0
 
         // 2. Iterar customers y enriquecer con estado de Redis
         for (const customer of customers) {
-            const memory = new ConversationMemory(client_id, customer.phone_number)
+            const memory = new ConversationMemory(clientIdNum, customer.phone_number)
 
-            // Optimización: Podríamos usar pipeline de Redis si fueran muchos
             const history = await memory.getHistory()
             const statusInfo = await memory.getStatus()
 
-            // Si no hay historial, asumimos que no hay conversación activa relevante
-            // O podemos mostrarla igual. Aquí filtramos vacías para limpiar la vista.
             if (!history.length) continue
 
             const lastMsg = history[history.length - 1]
@@ -48,7 +57,7 @@ export async function GET(req: Request) {
                 escalatedCount++
             } else if (isHumanHandled) {
                 convStatus = "human_handled"
-                activeCount++
+                humanHandledCount++
             } else if (history.length) {
                 convStatus = "active"
                 activeCount++
@@ -85,6 +94,7 @@ export async function GET(req: Request) {
             conversations,
             total: conversations.length,
             active: activeCount,
+            human_handled: humanHandledCount,
             escalated: escalatedCount,
             resolved: resolvedCount,
         })

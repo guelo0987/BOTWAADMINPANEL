@@ -1,13 +1,18 @@
 import { NextResponse } from "next/server"
 import prisma from "@/lib/db"
+import { getServerUser } from "@/lib/auth-server"
 import { validateToolsConfig, normalizeToolsConfig } from "@/lib/validate-tools-config"
 
-// GET - Obtener configuración del cliente
+// GET - Obtener configuración del cliente autenticado
 export async function GET(req: Request) {
     try {
+        const user = await getServerUser()
+        if (!user) {
+            return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+        }
+
         const { searchParams } = new URL(req.url)
         const client_id = searchParams.get("client_id")
-
         if (!client_id) {
             return NextResponse.json(
                 { error: "client_id is required" },
@@ -15,8 +20,13 @@ export async function GET(req: Request) {
             )
         }
 
+        const clientIdNum = parseInt(client_id, 10)
+        if (clientIdNum !== user.id) {
+            return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+        }
+
         const client = await prisma.client.findUnique({
-            where: { id: parseInt(client_id) },
+            where: { id: clientIdNum },
             select: {
                 id: true,
                 business_name: true,
@@ -56,9 +66,14 @@ export async function GET(req: Request) {
     }
 }
 
-// PUT - Actualizar configuración del cliente
+// PUT - Actualizar configuración del cliente autenticado
 export async function PUT(req: Request) {
     try {
+        const user = await getServerUser()
+        if (!user) {
+            return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+        }
+
         const body = await req.json()
         const {
             client_id,
@@ -79,9 +94,13 @@ export async function PUT(req: Request) {
             )
         }
 
-        // Validar que el cliente existe
+        const clientIdNum = parseInt(client_id, 10)
+        if (clientIdNum !== user.id) {
+            return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+        }
+
         const existingClient = await prisma.client.findUnique({
-            where: { id: parseInt(client_id) },
+            where: { id: clientIdNum },
         })
 
         if (!existingClient) {
@@ -123,9 +142,8 @@ export async function PUT(req: Request) {
             normalizedToolsConfig = normalizeToolsConfig(tools_config)
         }
 
-        // Actualizar cliente (whatsapp_* opcionales: permitir string o null para actualizar/limpiar)
         const updatedClient = await prisma.client.update({
-            where: { id: parseInt(client_id) },
+            where: { id: clientIdNum },
             data: {
                 ...(business_name && { business_name }),
                 ...(whatsapp_instance_id && { whatsapp_instance_id }),

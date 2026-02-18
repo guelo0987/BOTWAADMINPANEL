@@ -41,8 +41,8 @@ import {
   LogOut,
   ChevronUp,
   MessageCircle,
-  BarChart3,
   Bot,
+  BarChart3,
 } from "lucide-react"
 
 const navigation = [
@@ -58,7 +58,7 @@ const navigation = [
   {
     title: "Configuración",
     items: [
-      { title: "Bot", url: "/dashboard/bot-config", icon: Bot },
+      { title: "Configurar Bot", url: "/dashboard/bot-config", icon: Bot },
       { title: "Analíticas", url: "/dashboard/analytics", icon: BarChart3 },
     ],
   },
@@ -86,7 +86,7 @@ function DashboardSidebar() {
           </div>
           <div className="flex flex-col">
             <span className="text-sm font-semibold text-sidebar-foreground">CompleteAgent</span>
-            <span className="text-xs text-sidebar-foreground/60">Panel Admin</span>
+            <span className="text-xs text-sidebar-foreground/60">Panel del Cliente</span>
           </div>
         </div>
       </SidebarHeader>

@@ -1,4 +1,5 @@
 import React from "react"
+import Link from "next/link"
 import {
   MetricCard,
   ConversationsChart,
@@ -7,8 +8,9 @@ import {
   RecentConversations,
   UpcomingAppointments
 } from "@/components/dashboard/dashboard-widgets"
-import { Users, TrendingUp } from "lucide-react"
+import { Users, TrendingUp, MessageSquare, Calendar, Bot, ArrowRight } from "lucide-react"
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
 import { getDashboardStats, getConversationsChartData, getAppointmentStatusData, getHourlyData } from "@/services/dashboard.service"
 import { getRecentConversations } from "@/services/conversation.service"
 import { getUpcomingAppointments } from "@/services/appointment.service"
@@ -45,11 +47,36 @@ export default async function DashboardPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
-        <p className="text-muted-foreground">
-          Resumen de actividad de tu asistente virtual
-        </p>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
+          <p className="text-muted-foreground">
+            Resumen de actividad de tu asistente virtual
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <Button asChild variant="outline" size="sm">
+            <Link href="/dashboard/conversations">
+              <MessageSquare className="h-4 w-4 mr-2" />
+              Conversaciones
+              <ArrowRight className="h-4 w-4 ml-2" />
+            </Link>
+          </Button>
+          <Button asChild variant="outline" size="sm">
+            <Link href="/dashboard/appointments">
+              <Calendar className="h-4 w-4 mr-2" />
+              Citas
+              <ArrowRight className="h-4 w-4 ml-2" />
+            </Link>
+          </Button>
+          <Button asChild variant="outline" size="sm">
+            <Link href="/dashboard/bot-config">
+              <Bot className="h-4 w-4 mr-2" />
+              Configurar Bot
+              <ArrowRight className="h-4 w-4 ml-2" />
+            </Link>
+          </Button>
+        </div>
       </div>
 
       {/* Metrics Grid */}
