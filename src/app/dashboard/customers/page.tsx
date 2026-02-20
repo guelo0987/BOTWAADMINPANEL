@@ -130,6 +130,63 @@ function CustomerDetail({
   clientId?: number
 }) {
   const [isEditing, setIsEditing] = useState(false)
+  const [editName, setEditName] = useState(customer?.full_name || "")
+  const [editEmail, setEditEmail] = useState(String((customer?.data as Record<string, unknown>)?.email || ""))
+  const [editAddress, setEditAddress] = useState(String((customer?.data as Record<string, unknown>)?.direccion || (customer?.data as Record<string, unknown>)?.address || ""))
+  const [editJsonData, setEditJsonData] = useState(JSON.stringify(customer?.data, null, 2))
+  const [isSaving, setIsSaving] = useState(false)
+
+  useEffect(() => {
+    if (customer) {
+      setEditName(customer.full_name || "")
+      setEditEmail(String((customer.data as Record<string, unknown>)?.email || ""))
+      setEditAddress(String((customer.data as Record<string, unknown>)?.direccion || (customer.data as Record<string, unknown>)?.address || ""))
+      setEditJsonData(JSON.stringify(customer.data, null, 2))
+    }
+  }, [customer])
+
+  const handleSave = async () => {
+    if (!customer) return
+    setIsSaving(true)
+    try {
+      const currentData = (customer.data as Record<string, unknown>) || {}
+      const updatedData = { ...currentData, email: editEmail || undefined }
+      if (editAddress) updatedData.direccion = editAddress
+
+      const res = await fetch(`/api/client/customers/${customer.id}`, {
+        method: "PATCH",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ full_name: editName, data: updatedData }),
+      })
+      if (!res.ok) throw new Error("Error al guardar")
+      setIsEditing(false)
+    } catch {
+      // silently fail
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  const handleSaveJson = async () => {
+    if (!customer) return
+    setIsSaving(true)
+    try {
+      const parsed = JSON.parse(editJsonData)
+      const res = await fetch(`/api/client/customers/${customer.id}`, {
+        method: "PATCH",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ data: parsed }),
+      })
+      if (!res.ok) throw new Error("Error al guardar")
+      setIsEditing(false)
+    } catch {
+      // silently fail
+    } finally {
+      setIsSaving(false)
+    }
+  }
 
   if (!customer) return null
 
@@ -214,7 +271,7 @@ function CustomerDetail({
                 <div className="space-y-2">
                   <Label className="text-muted-foreground">Nombre completo</Label>
                   {isEditing ? (
-                    <Input defaultValue={customer.full_name || ""} />
+                    <Input value={editName} onChange={(e) => setEditName(e.target.value)} />
                   ) : (
                     <p className="font-medium">
                       {customer.full_name || "Sin nombre"}
@@ -233,7 +290,7 @@ function CustomerDetail({
                 <div className="space-y-2">
                   <Label className="text-muted-foreground">Email</Label>
                   {isEditing ? (
-                    <Input defaultValue={String((customer.data as Record<string, unknown>)?.email || "")} />
+                    <Input value={editEmail} onChange={(e) => setEditEmail(e.target.value)} />
                   ) : (
                     <p className="font-medium flex items-center gap-2">
                       <Mail className="h-4 w-4 text-muted-foreground" />
@@ -246,7 +303,7 @@ function CustomerDetail({
                   <div className="space-y-2">
                     <Label className="text-muted-foreground">Dirección</Label>
                     {isEditing ? (
-                      <Textarea defaultValue={String((customer.data as Record<string, unknown>).direccion || (customer.data as Record<string, unknown>).address || "")} />
+                      <Textarea value={editAddress} onChange={(e) => setEditAddress(e.target.value)} />
                     ) : (
                       <p className="font-medium flex items-center gap-2">
                         <MapPin className="h-4 w-4 text-muted-foreground" />
@@ -267,7 +324,7 @@ function CustomerDetail({
                 </div>
 
                 {isEditing && (
-                  <Button className="w-full mt-4">Guardar Cambios</Button>
+                  <Button className="w-full mt-4" onClick={handleSave} disabled={isSaving}>{isSaving ? "Guardando..." : "Guardar Cambios"}</Button>
                 )}
               </div>
             </TabsContent>
@@ -390,9 +447,10 @@ function CustomerDetail({
                     <Textarea
                       className="font-mono text-sm"
                       rows={10}
-                      defaultValue={JSON.stringify(customer.data, null, 2)}
+                      value={editJsonData}
+                      onChange={(e) => setEditJsonData(e.target.value)}
                     />
-                    <Button className="w-full">Guardar Datos</Button>
+                    <Button className="w-full" onClick={handleSaveJson} disabled={isSaving}>{isSaving ? "Guardando..." : "Guardar Datos"}</Button>
                   </div>
                 )}
               </div>
@@ -543,15 +601,37 @@ export default function CustomersPage() {
         </Card>
       </div>
 
-      {/* Search */}
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-        <Input
-          placeholder="Buscar por nombre, teléfono o email..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="pl-9"
-        />
+      {/* Search + Export */}
+      <div className="flex gap-3">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Buscar por nombre, teléfono o email..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="pl-9"
+          />
+        </div>
+        <Button
+          variant="outline"
+          onClick={() => {
+            const header = "ID,Nombre,Teléfono,Email,Fecha Registro\n"
+            const rows = filteredCustomers.map((c) => {
+              const email = (c.data as Record<string, unknown>)?.email || ""
+              return `${c.id},"${c.full_name || ""}","${c.phone_number}","${email}","${c.created_at}"`
+            }).join("\n")
+            const blob = new Blob([header + rows], { type: "text/csv" })
+            const url = URL.createObjectURL(blob)
+            const a = document.createElement("a")
+            a.href = url
+            a.download = `clientes_${new Date().toISOString().split("T")[0]}.csv`
+            a.click()
+            URL.revokeObjectURL(url)
+          }}
+        >
+          <FileText className="h-4 w-4 mr-2" />
+          Exportar CSV
+        </Button>
       </div>
 
       {/* Customers Table */}

@@ -30,12 +30,18 @@ import {
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Separator } from "@/components/ui/separator"
 import { Skeleton } from "@/components/ui/skeleton"
-import { Building2, LogOut, ChevronUp, Shield } from "lucide-react"
+import { Building2, LogOut, ChevronUp, Shield, LayoutDashboard, Users, Calendar, MessageSquare } from "lucide-react"
 
 const navigation = [
   {
-    title: "Administración",
-    items: [{ title: "Clientes", url: "/admin/clients", icon: Building2 }],
+    title: "Principal",
+    items: [
+      { title: "Dashboard", url: "/admin", icon: LayoutDashboard },
+      { title: "Clientes", url: "/admin/clients", icon: Building2 },
+      { title: "Customers", url: "/admin/customers", icon: Users },
+      { title: "Citas", url: "/admin/appointments", icon: Calendar },
+      { title: "Conversaciones", url: "/admin/conversations", icon: MessageSquare },
+    ],
   },
 ]
 
@@ -72,7 +78,7 @@ function AdminSidebar() {
               <SidebarMenu>
                 {group.items.map((item) => (
                   <SidebarMenuItem key={item.title}>
-                    <SidebarMenuButton asChild isActive={pathname === item.url}>
+                    <SidebarMenuButton asChild isActive={pathname === item.url || (item.url !== "/admin" && pathname.startsWith(item.url))}>
                       <Link href={item.url}>
                         <item.icon className="h-4 w-4" />
                         <span>{item.title}</span>

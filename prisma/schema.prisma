@@ -47,10 +47,26 @@ model Client {
   whatsapp_api_version   String?  @default("v21.0")
 
   // Relations
-  customers    Customer[]
-  appointments Appointment[]
+  customers         Customer[]
+  appointments      Appointment[]
+  email_settings    ClientEmailSettings?
 
   @@map("clients")
+}
+
+model ClientEmailSettings {
+  id            Int     @id @default(autoincrement())
+  client_id     Int     @unique
+  primary_color String  @default("#333333") @db.VarChar(50)
+  secondary_color String @default("#666666") @db.VarChar(50)
+  logo_url      String?
+  sender_name   String?
+  footer_text   String?
+  templates     Json?   @default("{}")
+
+  client Client @relation(fields: [client_id], references: [id], onDelete: Cascade)
+
+  @@map("client_email_settings")
 }
 
 model Customer {

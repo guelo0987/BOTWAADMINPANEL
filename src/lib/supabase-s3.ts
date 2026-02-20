@@ -29,3 +29,4 @@ export const s3Client =
     : null
 
 export const SUPABASE_BUCKET_CATALOGS = process.env.SUPABASE_BUCKET_CATALOGS || "catalogs"
+export const SUPABASE_BUCKET_LOGOS = process.env.SUPABASE_BUCKET_LOGOS || "logos"

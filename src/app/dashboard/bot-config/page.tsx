@@ -40,6 +40,8 @@ import {
   FileUp,
   FileText,
   ExternalLink,
+  Mail,
+  ImageIcon,
 } from "lucide-react"
 import { useAuth } from "@/lib/auth-context"
 import { Client } from "@/types"
@@ -170,6 +172,107 @@ function CatalogPdfUpload({
   )
 }
 
+function LogoUpload({
+  clientId,
+  logoUrl,
+  logoDisplayUrl,
+  onUploaded,
+  onCleared,
+}: {
+  clientId: number | undefined
+  logoUrl: string | null | undefined
+  logoDisplayUrl: string | null | undefined
+  onUploaded: (key: string) => void
+  onCleared: () => void
+}) {
+  const [uploading, setUploading] = useState(false)
+  const { toast } = useToast()
+  const fileInputRef = useRef<HTMLInputElement | null>(null)
+
+  const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file || !/^image\/(png|jpe?g|webp)$/i.test(file.type)) {
+      toast({ title: "Selecciona una imagen PNG, JPG o WebP", variant: "destructive" })
+      return
+    }
+    if (file.size > 2 * 1024 * 1024) {
+      toast({ title: "El logo no puede superar 2 MB", variant: "destructive" })
+      return
+    }
+    setUploading(true)
+    try {
+      const form = new FormData()
+      form.append("file", file)
+      const res = await fetch("/api/client/email-settings/logo", {
+        method: "POST",
+        body: form,
+        credentials: "include",
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data.error || "Error al subir")
+      onUploaded(data.logo_url)
+      toast({ title: "Logo subido correctamente" })
+    } catch (err) {
+      toast({
+        title: "Error",
+        description: err instanceof Error ? err.message : "No se pudo subir el logo",
+        variant: "destructive",
+      })
+    } finally {
+      setUploading(false)
+      e.target.value = ""
+    }
+  }
+
+  return (
+    <div className="space-y-3 rounded-lg border border-border p-4 bg-muted/30">
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/png,image/jpeg,image/jpg,image/webp"
+        className="hidden"
+        onChange={handleFile}
+        disabled={uploading || !clientId}
+      />
+      {logoUrl ? (
+        <div className="flex flex-wrap items-center gap-3">
+          {logoDisplayUrl && (
+            <img src={logoDisplayUrl} alt="Logo" className="h-12 w-12 object-contain rounded border" />
+          )}
+          <span className="text-sm font-medium">Logo</span>
+          <Button type="button" variant="outline" size="sm" disabled={uploading || !clientId} onClick={() => fileInputRef.current?.click()}>
+            {uploading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <ImageIcon className="h-4 w-4 mr-2" />}
+            Cambiar logo
+          </Button>
+          <Button type="button" variant="ghost" size="sm" onClick={onCleared} className="text-destructive">
+            Quitar logo
+          </Button>
+        </div>
+      ) : (
+        <div className="flex flex-wrap items-center gap-3">
+          <Button type="button" variant="outline" size="sm" disabled={uploading || !clientId} onClick={() => fileInputRef.current?.click()}>
+            {uploading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <ImageIcon className="h-4 w-4 mr-2" />}
+            Subir logo
+          </Button>
+          <span className="text-xs text-muted-foreground">PNG, JPG o WebP. Máx. 2 MB.</span>
+        </div>
+      )}
+    </div>
+  )
+}
+
+type EmailSettings = {
+  id: number
+  client_id: number
+  primary_color: string
+  secondary_color: string
+  logo_url: string | null
+  sender_name: string | null
+  footer_text: string | null
+  templates: Record<string, unknown> | null
+  logo_display_url?: string | null
+}
+
 export default function BotConfigPage() {
   const { user } = useAuth()
   const [config, setConfig] = useState<Client | null>(null)
@@ -177,6 +280,8 @@ export default function BotConfigPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
   const [showPromptPreview, setShowPromptPreview] = useState(false)
+  const [emailSettings, setEmailSettings] = useState<EmailSettings | null>(null)
+  const [emailSaving, setEmailSaving] = useState(false)
   const { toast } = useToast()
 
   // Mantener ref actualizada para que Guardar siempre envíe el estado más reciente (evita que borrados no se persistan)
@@ -305,6 +410,23 @@ export default function BotConfigPage() {
     loadConfig()
   }, [user?.id, toast])
 
+  // Cargar configuración de email
+  useEffect(() => {
+    const loadEmailSettings = async () => {
+      if (!user?.id) return
+      try {
+        const res = await fetch("/api/client/email-settings", { credentials: "include" })
+        if (!res.ok) return
+        const data = await res.json()
+        if (data.settings) setEmailSettings(data.settings)
+        else setEmailSettings({ id: 0, client_id: user.id, primary_color: "#333333", secondary_color: "#666666", logo_url: null, sender_name: null, footer_text: null, templates: {} })
+      } catch {
+        setEmailSettings({ id: 0, client_id: user.id, primary_color: "#333333", secondary_color: "#666666", logo_url: null, sender_name: null, footer_text: null, templates: {} })
+      }
+    }
+    loadEmailSettings()
+  }, [user?.id])
+
   const handleSave = async () => {
     const latest = configRef.current ?? config
     if (!latest || !user?.id) return
@@ -366,6 +488,39 @@ export default function BotConfigPage() {
       })
     } finally {
       setIsSaving(false)
+    }
+  }
+
+  const handleSaveEmail = async () => {
+    if (!user?.id || !emailSettings) return
+    try {
+      setEmailSaving(true)
+      const res = await fetch("/api/client/email-settings", {
+        method: "PATCH",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          primary_color: emailSettings.primary_color,
+          secondary_color: emailSettings.secondary_color,
+          logo_url: emailSettings.logo_url,
+          sender_name: emailSettings.sender_name || null,
+          footer_text: emailSettings.footer_text || null,
+          templates: emailSettings.templates || {},
+        }),
+      })
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        throw new Error(data.error || "Error al guardar")
+      }
+      toast({ title: "Configuración de email guardada" })
+    } catch (err) {
+      toast({
+        title: "Error",
+        description: err instanceof Error ? err.message : "No se pudo guardar",
+        variant: "destructive",
+      })
+    } finally {
+      setEmailSaving(false)
     }
   }
 
@@ -462,7 +617,7 @@ export default function BotConfigPage() {
       </Card>
 
       <Tabs defaultValue="business" className="space-y-4">
-        <TabsList className={`grid w-full ${(config.tools_config.business_type === "clinic" || config.tools_config.business_type === "salon") ? "grid-cols-4" : "grid-cols-3"}`}>
+        <TabsList className={`grid w-full ${(config.tools_config.business_type === "clinic" || config.tools_config.business_type === "salon") ? "grid-cols-5" : "grid-cols-4"}`}>
           <TabsTrigger value="business">
             <Building2 className="h-4 w-4 mr-2" />
             Negocio
@@ -481,6 +636,10 @@ export default function BotConfigPage() {
               Equipo
             </TabsTrigger>
           )}
+          <TabsTrigger value="email">
+            <Mail className="h-4 w-4 mr-2" />
+            Email
+          </TabsTrigger>
         </TabsList>
 
         {/* Business Tab */}
@@ -1556,6 +1715,88 @@ export default function BotConfigPage() {
                 </CardContent>
               </Card>
               )}
+        </TabsContent>
+
+        {/* Email Tab */}
+        <TabsContent value="email" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Configuración de Email</CardTitle>
+              <CardDescription>
+                Personaliza los colores, logo y texto de los correos enviados a tus clientes
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                <LogoUpload
+                  clientId={user?.id}
+                  logoUrl={emailSettings?.logo_url}
+                  logoDisplayUrl={emailSettings?.logo_display_url}
+                  onUploaded={(key) =>
+                    setEmailSettings((prev) =>
+                      prev ? { ...prev, logo_url: key } : user ? { id: 0, client_id: user.id, primary_color: "#333333", secondary_color: "#666666", logo_url: key, sender_name: null, footer_text: null, templates: {} } : prev
+                    )
+                  }
+                  onCleared={() => setEmailSettings((prev) => (prev ? { ...prev, logo_url: null } : prev))}
+                />
+                <Button onClick={handleSaveEmail} disabled={emailSaving}>
+                  {emailSaving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
+                  Guardar Email
+                </Button>
+              </div>
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="space-y-2">
+                  <Label>Color primario</Label>
+                  <div className="flex gap-2">
+                    <Input
+                      type="color"
+                      value={emailSettings?.primary_color || "#333333"}
+                      onChange={(e) => setEmailSettings((prev) => (prev ? { ...prev, primary_color: e.target.value } : { id: 0, client_id: user!.id, primary_color: e.target.value, secondary_color: "#666666", logo_url: null, sender_name: null, footer_text: null, templates: {} }))}
+                      className="h-10 w-14 p-1 cursor-pointer"
+                    />
+                    <Input
+                      value={emailSettings?.primary_color || "#333333"}
+                      onChange={(e) => setEmailSettings((prev) => (prev ? { ...prev, primary_color: e.target.value } : { id: 0, client_id: user!.id, primary_color: e.target.value, secondary_color: "#666666", logo_url: null, sender_name: null, footer_text: null, templates: {} }))}
+                      className="font-mono"
+                    />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label>Color secundario</Label>
+                  <div className="flex gap-2">
+                    <Input
+                      type="color"
+                      value={emailSettings?.secondary_color || "#666666"}
+                      onChange={(e) => setEmailSettings((prev) => (prev ? { ...prev, secondary_color: e.target.value } : { id: 0, client_id: user!.id, primary_color: "#333333", secondary_color: e.target.value, logo_url: null, sender_name: null, footer_text: null, templates: {} }))}
+                      className="h-10 w-14 p-1 cursor-pointer"
+                    />
+                    <Input
+                      value={emailSettings?.secondary_color || "#666666"}
+                      onChange={(e) => setEmailSettings((prev) => (prev ? { ...prev, secondary_color: e.target.value } : { id: 0, client_id: user!.id, primary_color: "#333333", secondary_color: e.target.value, logo_url: null, sender_name: null, footer_text: null, templates: {} }))}
+                      className="font-mono"
+                    />
+                  </div>
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label>Nombre del remitente</Label>
+                <Input
+                  placeholder="Ej: Clínica Moreira"
+                  value={emailSettings?.sender_name || ""}
+                  onChange={(e) => setEmailSettings((prev) => (prev ? { ...prev, sender_name: e.target.value || null } : { id: 0, client_id: user!.id, primary_color: "#333333", secondary_color: "#666666", logo_url: null, sender_name: e.target.value || null, footer_text: null, templates: {} }))}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Texto del pie de página</Label>
+                <Textarea
+                  placeholder="Ej: © 2025 Mi Negocio. Todos los derechos reservados."
+                  value={emailSettings?.footer_text || ""}
+                  onChange={(e) => setEmailSettings((prev) => (prev ? { ...prev, footer_text: e.target.value || null } : { id: 0, client_id: user!.id, primary_color: "#333333", secondary_color: "#666666", logo_url: null, sender_name: null, footer_text: e.target.value || null, templates: {} }))}
+                  rows={3}
+                />
+              </div>
+            </CardContent>
+          </Card>
         </TabsContent>
 
         {/* Team Tab */}

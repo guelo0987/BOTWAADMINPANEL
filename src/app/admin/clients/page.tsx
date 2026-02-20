@@ -35,7 +35,7 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Loader2, Plus, RefreshCcw, LogIn, KeyRound, Power } from "lucide-react"
+import { Loader2, Plus, RefreshCcw, LogIn, KeyRound, Power, Mail, ImageIcon } from "lucide-react"
 import type { ToolsConfig } from "@/types"
 
 type ClientRow = {
@@ -80,6 +80,20 @@ export default function AdminClientsPage() {
   const [resetClientId, setResetClientId] = useState<number | null>(null)
   const [newPassword, setNewPassword] = useState("")
   const [isResetting, setIsResetting] = useState(false)
+
+  // Email settings dialog
+  const [openEmail, setOpenEmail] = useState(false)
+  const [emailClientId, setEmailClientId] = useState<number | null>(null)
+  const [emailSettings, setEmailSettings] = useState<{
+    primary_color: string
+    secondary_color: string
+    logo_url: string | null
+    sender_name: string | null
+    footer_text: string | null
+    logo_display_url?: string | null
+  } | null>(null)
+  const [emailSaving, setEmailSaving] = useState(false)
+  const [emailLogoUploading, setEmailLogoUploading] = useState(false)
 
   const businessTypeLabel = BUSINESS_TYPES.find((t) => t.value === businessType)?.label ?? "General"
 
@@ -221,6 +235,82 @@ export default function AdminClientsPage() {
       window.location.href = "/dashboard"
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Error al acceder como cliente")
+    }
+  }
+
+  const openEmailSettings = async (clientId: number) => {
+    setEmailClientId(clientId)
+    setOpenEmail(true)
+    setEmailSettings(null)
+    try {
+      const res = await fetch(`/api/admin/clients/${clientId}/email-settings`)
+      const data = await res.json().catch(() => ({}))
+      if (res.ok && data.settings) {
+        setEmailSettings({
+          primary_color: data.settings.primary_color || "#333333",
+          secondary_color: data.settings.secondary_color || "#666666",
+          logo_url: data.settings.logo_url ?? null,
+          sender_name: data.settings.sender_name ?? null,
+          footer_text: data.settings.footer_text ?? null,
+          logo_display_url: data.settings.logo_display_url,
+        })
+      } else {
+        setEmailSettings({
+          primary_color: "#333333",
+          secondary_color: "#666666",
+          logo_url: null,
+          sender_name: null,
+          footer_text: null,
+        })
+      }
+    } catch {
+      setEmailSettings({
+        primary_color: "#333333",
+        secondary_color: "#666666",
+        logo_url: null,
+        sender_name: null,
+        footer_text: null,
+      })
+    }
+  }
+
+  const saveEmailSettings = async () => {
+    if (!emailClientId || !emailSettings) return
+    try {
+      setEmailSaving(true)
+      const res = await fetch(`/api/admin/clients/${emailClientId}/email-settings`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(emailSettings),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data.error || "Error al guardar")
+      toast.success("Configuración de email guardada")
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Error al guardar")
+    } finally {
+      setEmailSaving(false)
+    }
+  }
+
+  const uploadEmailLogo = async (file: File) => {
+    if (!emailClientId) return
+    setEmailLogoUploading(true)
+    try {
+      const form = new FormData()
+      form.append("file", file)
+      const res = await fetch(`/api/admin/clients/${emailClientId}/email-settings/logo`, {
+        method: "POST",
+        body: form,
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data.error || "Error al subir")
+      setEmailSettings((prev) => (prev ? { ...prev, logo_url: data.logo_url } : prev))
+      toast.success("Logo subido")
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Error al subir logo")
+    } finally {
+      setEmailLogoUploading(false)
     }
   }
 
@@ -392,6 +482,16 @@ export default function AdminClientsPage() {
                           <Button
                             variant="outline"
                             size="sm"
+                            onClick={() => openEmailSettings(c.id)}
+                            disabled={!isAdmin}
+                            title="Configurar email"
+                          >
+                            <Mail className="h-4 w-4 mr-2" />
+                            Email
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
                             onClick={() => impersonate(c.id)}
                             disabled={!isAdmin}
                             title="Entrar como este cliente"
@@ -438,6 +538,107 @@ export default function AdminClientsPage() {
           )}
         </CardContent>
       </Card>
+
+      <Dialog open={openEmail} onOpenChange={setOpenEmail}>
+        <DialogContent className="sm:max-w-[560px]">
+          <DialogHeader>
+            <DialogTitle>Configuración de Email</DialogTitle>
+            <DialogDescription>
+              Colores, logo y texto para los correos del cliente
+            </DialogDescription>
+          </DialogHeader>
+          {emailSettings && (
+            <div className="space-y-4">
+              <div className="rounded-lg border p-4 bg-muted/30 space-y-3">
+                <Label>Logo</Label>
+                <input
+                  type="file"
+                  accept="image/png,image/jpeg,image/jpg,image/webp"
+                  className="hidden"
+                  id="admin-email-logo"
+                  onChange={(e) => {
+                    const f = e.target.files?.[0]
+                    if (f && /^image\/(png|jpe?g|webp)$/i.test(f.type) && f.size <= 2 * 1024 * 1024) {
+                      uploadEmailLogo(f)
+                    } else if (f) {
+                      toast.error("Solo PNG, JPG o WebP. Máx. 2 MB")
+                    }
+                    e.target.value = ""
+                  }}
+                />
+                {emailSettings.logo_url ? (
+                  <div className="flex items-center gap-3">
+                    {emailSettings.logo_display_url && (
+                      <img src={emailSettings.logo_display_url} alt="Logo" className="h-12 w-12 object-contain rounded border" />
+                    )}
+                    <Button type="button" variant="outline" size="sm" disabled={emailLogoUploading} onClick={() => document.getElementById("admin-email-logo")?.click()}>
+                      {emailLogoUploading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <ImageIcon className="h-4 w-4 mr-2" />}
+                      Cambiar logo
+                    </Button>
+                    <Button type="button" variant="ghost" size="sm" className="text-destructive" onClick={() => setEmailSettings((p) => (p ? { ...p, logo_url: null } : p))}>
+                      Quitar
+                    </Button>
+                  </div>
+                ) : (
+                  <Button type="button" variant="outline" size="sm" disabled={emailLogoUploading} onClick={() => document.getElementById("admin-email-logo")?.click()}>
+                    {emailLogoUploading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <ImageIcon className="h-4 w-4 mr-2" />}
+                    Subir logo
+                  </Button>
+                )}
+              </div>
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="space-y-2">
+                  <Label>Color primario</Label>
+                  <div className="flex gap-2">
+                    <input
+                      type="color"
+                      value={emailSettings.primary_color}
+                      onChange={(e) => setEmailSettings((p) => (p ? { ...p, primary_color: e.target.value } : p))}
+                      className="h-10 w-14 rounded border cursor-pointer p-1"
+                    />
+                    <Input value={emailSettings.primary_color} onChange={(e) => setEmailSettings((p) => (p ? { ...p, primary_color: e.target.value } : p))} className="font-mono" />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label>Color secundario</Label>
+                  <div className="flex gap-2">
+                    <input
+                      type="color"
+                      value={emailSettings.secondary_color}
+                      onChange={(e) => setEmailSettings((p) => (p ? { ...p, secondary_color: e.target.value } : p))}
+                      className="h-10 w-14 rounded border cursor-pointer p-1"
+                    />
+                    <Input value={emailSettings.secondary_color} onChange={(e) => setEmailSettings((p) => (p ? { ...p, secondary_color: e.target.value } : p))} className="font-mono" />
+                  </div>
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label>Nombre del remitente</Label>
+                <Input
+                  placeholder="Ej: Clínica Moreira"
+                  value={emailSettings.sender_name || ""}
+                  onChange={(e) => setEmailSettings((p) => (p ? { ...p, sender_name: e.target.value || null } : p))}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Texto del pie de página</Label>
+                <Textarea
+                  placeholder="Ej: © 2025 Mi Negocio"
+                  value={emailSettings.footer_text || ""}
+                  onChange={(e) => setEmailSettings((p) => (p ? { ...p, footer_text: e.target.value || null } : p))}
+                  rows={3}
+                />
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button onClick={saveEmailSettings} disabled={emailSaving || !emailSettings}>
+              {emailSaving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
+              Guardar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={openReset} onOpenChange={setOpenReset}>
         <DialogContent className="sm:max-w-[500px]">

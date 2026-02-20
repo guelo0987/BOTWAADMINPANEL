@@ -60,6 +60,7 @@ const navigation = [
     items: [
       { title: "Configurar Bot", url: "/dashboard/bot-config", icon: Bot },
       { title: "Analíticas", url: "/dashboard/analytics", icon: BarChart3 },
+      { title: "Email", url: "/dashboard/email-settings", icon: Settings },
     ],
   },
 ]
