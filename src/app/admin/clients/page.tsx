@@ -43,6 +43,7 @@ type ClientRow = {
   business_name: string
   whatsapp_instance_id: string
   is_active: boolean
+  bot_disabled_by_admin: boolean
   tools_config: ToolsConfig
   created_at: string
 }
@@ -186,12 +187,15 @@ export default function AdminClientsPage() {
       const res = await fetch(`/api/admin/clients/${clientId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ is_active: nextActive }),
+        body: JSON.stringify({
+          is_active: nextActive,
+          bot_disabled_by_admin: !nextActive,
+        }),
       })
       const data = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(data.error || "Error actualizando estado")
-      setClients((prev) => prev.map((c) => (c.id === clientId ? { ...c, is_active: nextActive } : c)))
-      toast.success(nextActive ? "Cliente activado" : "Cliente desactivado")
+      setClients((prev) => prev.map((c) => (c.id === clientId ? { ...c, is_active: nextActive, bot_disabled_by_admin: !nextActive } : c)))
+      toast.success(nextActive ? "Bot activado — el cliente puede controlarlo" : "Bot desactivado por admin — el cliente NO podrá reactivarlo")
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Error actualizando estado")
     }
@@ -471,11 +475,18 @@ export default function AdminClientsPage() {
                         <Badge variant="secondary">{c.tools_config?.business_type || "general"}</Badge>
                       </TableCell>
                       <TableCell>
-                        {c.is_active ? (
-                          <Badge className="bg-green-600 hover:bg-green-600">Activo</Badge>
-                        ) : (
-                          <Badge variant="destructive">Inactivo</Badge>
-                        )}
+                        <div className="flex flex-col gap-1">
+                          {c.is_active ? (
+                            <Badge className="bg-green-600 hover:bg-green-600">Activo</Badge>
+                          ) : (
+                            <Badge variant="destructive">Inactivo</Badge>
+                          )}
+                          {c.bot_disabled_by_admin && (
+                            <Badge variant="outline" className="text-xs text-orange-600 border-orange-300">
+                              Bloqueado por admin
+                            </Badge>
+                          )}
+                        </div>
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-2">

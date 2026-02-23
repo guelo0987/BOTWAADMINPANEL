@@ -83,6 +83,7 @@ export async function GET() {
         business_name: true,
         whatsapp_instance_id: true,
         is_active: true,
+        bot_disabled_by_admin: true,
         tools_config: true,
         created_at: true,
       },

@@ -18,6 +18,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
         business_name: true,
         whatsapp_instance_id: true,
         is_active: true,
+        bot_disabled_by_admin: true,
         system_prompt_template: true,
         tools_config: true,
         created_at: true,
@@ -38,12 +39,13 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     const clientId = Number(id)
 
     const body = await req.json()
-    const { business_name, whatsapp_instance_id, is_active, password, system_prompt_template, tools_config } = body
+    const { business_name, whatsapp_instance_id, is_active, password, system_prompt_template, tools_config, bot_disabled_by_admin } = body
 
     const data: any = {}
     if (typeof business_name === "string") data.business_name = business_name
     if (typeof whatsapp_instance_id === "string") data.whatsapp_instance_id = whatsapp_instance_id
     if (typeof is_active === "boolean") data.is_active = is_active
+    if (typeof bot_disabled_by_admin === "boolean") data.bot_disabled_by_admin = bot_disabled_by_admin
     if (typeof system_prompt_template === "string") data.system_prompt_template = system_prompt_template
 
     if (tools_config) {
@@ -67,6 +69,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
         business_name: true,
         whatsapp_instance_id: true,
         is_active: true,
+        bot_disabled_by_admin: true,
         tools_config: true,
         created_at: true,
       },

@@ -37,6 +37,7 @@ model Client {
   whatsapp_instance_id   String   @unique
   password_hash          String
   is_active              Boolean  @default(true)
+  bot_disabled_by_admin  Boolean  @default(false)
   system_prompt_template String   @db.Text
   tools_config           Json?    @default("{}")
   created_at             DateTime @default(now())

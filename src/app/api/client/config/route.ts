@@ -32,6 +32,7 @@ export async function GET(req: Request) {
                 business_name: true,
                 whatsapp_instance_id: true,
                 is_active: true,
+                bot_disabled_by_admin: true,
                 system_prompt_template: true,
                 tools_config: true,
                 created_at: true,
@@ -110,6 +111,13 @@ export async function PUT(req: Request) {
             )
         }
 
+        if (is_active === true && existingClient.bot_disabled_by_admin) {
+            return NextResponse.json(
+                { error: "El bot fue desactivado por el administrador. Contacta al soporte para reactivarlo." },
+                { status: 403 }
+            )
+        }
+
         // Validar whatsapp_instance_id único si se está cambiando
         if (whatsapp_instance_id && whatsapp_instance_id !== existingClient.whatsapp_instance_id) {
             const duplicate = await prisma.client.findUnique({
@@ -159,6 +167,7 @@ export async function PUT(req: Request) {
                 business_name: true,
                 whatsapp_instance_id: true,
                 is_active: true,
+                bot_disabled_by_admin: true,
                 system_prompt_template: true,
                 tools_config: true,
                 created_at: true,

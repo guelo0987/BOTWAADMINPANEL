@@ -5,6 +5,7 @@ export interface Client {
   business_name: string
   whatsapp_instance_id: string
   is_active: boolean
+  bot_disabled_by_admin: boolean
   system_prompt_template: string
   tools_config: ToolsConfig
   created_at: string
@@ -88,6 +89,17 @@ export interface ToolsConfig {
   delivery_hours?: { start: string; end: string }
   /** Duración en minutos por slot de entrega (store, default 60). */
   delivery_duration?: number
+
+  /** Horario programado del bot: si está activo, el bot solo funciona en el rango definido. */
+  bot_schedule_enabled?: boolean
+  /** Hora de inicio del horario del bot (HH:mm). */
+  bot_schedule_start?: string
+  /** Hora de fin del horario del bot (HH:mm). */
+  bot_schedule_end?: string
+  /** Modo fuera de horario: "off" = no responde, "message" = envía mensaje personalizado. */
+  bot_out_of_hours_mode?: "off" | "message"
+  /** Mensaje personalizado cuando el bot está fuera de horario (solo si mode === "message"). */
+  bot_out_of_hours_message?: string
 }
 
 export interface Customer {

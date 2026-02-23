@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect, useRef, useMemo } from "react"
 import {
   Card,
   CardContent,
@@ -34,7 +34,6 @@ import {
   Trash2,
   Calendar,
   MessageSquare,
-  Settings,
   Eye,
   Loader2,
   FileUp,
@@ -42,6 +41,10 @@ import {
   ExternalLink,
   Mail,
   ImageIcon,
+  ShieldAlert,
+  CalendarClock,
+  AlertTriangle,
+  CheckCircle2,
 } from "lucide-react"
 import { useAuth } from "@/lib/auth-context"
 import { Client } from "@/types"
@@ -277,14 +280,29 @@ export default function BotConfigPage() {
   const { user } = useAuth()
   const [config, setConfig] = useState<Client | null>(null)
   const configRef = useRef<Client | null>(null)
+  const [savedConfig, setSavedConfig] = useState<string>("")
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
   const [showPromptPreview, setShowPromptPreview] = useState(false)
   const [emailSettings, setEmailSettings] = useState<EmailSettings | null>(null)
   const [emailSaving, setEmailSaving] = useState(false)
+  const [showSaveSuccess, setShowSaveSuccess] = useState(false)
   const { toast } = useToast()
 
-  // Mantener ref actualizada para que Guardar siempre envíe el estado más reciente (evita que borrados no se persistan)
+  const hasUnsavedChanges = useMemo(() => {
+    if (!config || !savedConfig) return false
+    return JSON.stringify(config) !== savedConfig
+  }, [config, savedConfig])
+
+  useEffect(() => {
+    if (!hasUnsavedChanges) return
+    const handler = (e: BeforeUnloadEvent) => {
+      e.preventDefault()
+    }
+    window.addEventListener("beforeunload", handler)
+    return () => window.removeEventListener("beforeunload", handler)
+  }, [hasUnsavedChanges])
+
   useEffect(() => {
     configRef.current = config
   }, [config])
@@ -357,6 +375,7 @@ export default function BotConfigPage() {
 
         const normalizedConfig: Client = {
           ...data,
+          bot_disabled_by_admin: data.bot_disabled_by_admin ?? false,
           whatsapp_access_token: data.whatsapp_access_token ?? null,
           whatsapp_app_secret: data.whatsapp_app_secret ?? null,
           whatsapp_api_version: data.whatsapp_api_version ?? "v21.0",
@@ -381,7 +400,6 @@ export default function BotConfigPage() {
             catalog_source: catalogSource,
             catalog_pdf_key: catalogPdfKeyFromDb ?? undefined,
             catalog: { categories: catalogCategories },
-            // Campos opcionales - usar valores existentes o undefined
             calendar_id: toolsConfig.calendar_id,
             contact_phone: toolsConfig.contact_phone,
             menu_url: toolsConfig.menu_url,
@@ -392,9 +410,15 @@ export default function BotConfigPage() {
             slot_duration: toolsConfig.slot_duration,
             delivery_hours: toolsConfig.delivery_hours,
             delivery_duration: toolsConfig.delivery_duration,
+            bot_schedule_enabled: toolsConfig.bot_schedule_enabled ?? false,
+            bot_schedule_start: toolsConfig.bot_schedule_start || "08:00",
+            bot_schedule_end: toolsConfig.bot_schedule_end || "18:00",
+            bot_out_of_hours_mode: toolsConfig.bot_out_of_hours_mode || "off",
+            bot_out_of_hours_message: toolsConfig.bot_out_of_hours_message || "",
           },
         }
         setConfig(normalizedConfig)
+        setSavedConfig(JSON.stringify(normalizedConfig))
       } catch (error) {
         toast({
           title: "Error",
@@ -471,14 +495,17 @@ export default function BotConfigPage() {
 
       const result = await response.json()
       
-      // Actualizar config con la respuesta del servidor (normalizada)
       if (result.client) {
         setConfig(result.client)
+        setSavedConfig(JSON.stringify(result.client))
       }
 
+      setShowSaveSuccess(true)
+      setTimeout(() => setShowSaveSuccess(false), 4000)
+
       toast({
-        title: "Éxito",
-        description: "Configuración guardada correctamente",
+        title: "Guardado correctamente",
+        description: "Todos los cambios fueron guardados exitosamente.",
       })
     } catch (error: unknown) {
       toast({
@@ -560,6 +587,28 @@ export default function BotConfigPage() {
 
   return (
     <div className="space-y-6">
+      {/* Unsaved changes warning */}
+      {hasUnsavedChanges && (
+        <div className="sticky top-0 z-50 rounded-lg border border-amber-300 bg-amber-50 dark:border-amber-700 dark:bg-amber-950/60 p-3 flex items-center justify-between gap-4 shadow-sm">
+          <div className="flex items-center gap-2 text-amber-800 dark:text-amber-200">
+            <AlertTriangle className="h-5 w-5 shrink-0" />
+            <span className="text-sm font-medium">Tienes cambios sin guardar. Recuerda guardar antes de salir.</span>
+          </div>
+          <Button size="sm" onClick={handleSave} disabled={isSaving}>
+            <Save className="h-4 w-4 mr-1" />
+            {isSaving ? "Guardando..." : "Guardar ahora"}
+          </Button>
+        </div>
+      )}
+
+      {/* Save success banner */}
+      {showSaveSuccess && (
+        <div className="rounded-lg border border-green-300 bg-green-50 dark:border-green-700 dark:bg-green-950/60 p-3 flex items-center gap-2 text-green-800 dark:text-green-200 shadow-sm animate-in fade-in slide-in-from-top-2 duration-300">
+          <CheckCircle2 className="h-5 w-5 shrink-0" />
+          <span className="text-sm font-medium">Todos los cambios fueron guardados correctamente.</span>
+        </div>
+      )}
+
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">
@@ -569,7 +618,7 @@ export default function BotConfigPage() {
             Personaliza el comportamiento de tu asistente virtual
           </p>
         </div>
-        <Button onClick={handleSave} disabled={isSaving}>
+        <Button onClick={handleSave} disabled={isSaving || !hasUnsavedChanges}>
           <Save className="h-4 w-4 mr-2" />
           {isSaving ? "Guardando..." : "Guardar Cambios"}
         </Button>
@@ -578,46 +627,66 @@ export default function BotConfigPage() {
       {/* Status Card */}
       <Card>
         <CardContent className="p-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10">
-                <Bot className="h-6 w-6 text-primary" />
+          <div className="flex flex-col gap-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10">
+                  <Bot className="h-6 w-6 text-primary" />
+                </div>
+                <div>
+                  <p className="font-semibold">{config.business_name}</p>
+                  <p className="text-sm text-muted-foreground">
+                    ID: {config.whatsapp_instance_id}
+                  </p>
+                </div>
               </div>
-              <div>
-                <p className="font-semibold">{config.business_name}</p>
-                <p className="text-sm text-muted-foreground">
-                  ID: {config.whatsapp_instance_id}
-                </p>
+              <div className="flex items-center gap-3">
+                <Label htmlFor="bot-active" className="text-sm">
+                  Bot Activo
+                </Label>
+                <Switch
+                  id="bot-active"
+                  checked={config.is_active}
+                  disabled={config.bot_disabled_by_admin}
+                  onCheckedChange={(checked) =>
+                    setConfig({ ...config, is_active: checked })
+                  }
+                />
+                <Badge
+                  variant="outline"
+                  className={
+                    config.is_active
+                      ? "bg-success/10 text-success border-success/20"
+                      : "bg-destructive/10 text-destructive border-destructive/20"
+                  }
+                >
+                  {config.is_active ? "Activo" : "Inactivo"}
+                </Badge>
               </div>
             </div>
-            <div className="flex items-center gap-3">
-              <Label htmlFor="bot-active" className="text-sm">
-                Bot Activo
-              </Label>
-              <Switch
-                id="bot-active"
-                checked={config.is_active}
-                onCheckedChange={(checked) =>
-                  setConfig({ ...config, is_active: checked })
-                }
-              />
-              <Badge
-                variant="outline"
-                className={
-                  config.is_active
-                    ? "bg-success/10 text-success border-success/20"
-                    : "bg-destructive/10 text-destructive border-destructive/20"
-                }
-              >
-                {config.is_active ? "Activo" : "Inactivo"}
-              </Badge>
-            </div>
+
+            {/* Admin override warning */}
+            {config.bot_disabled_by_admin && (
+              <div className="rounded-lg border border-red-200 dark:border-red-900/50 bg-red-50 dark:bg-red-950/30 p-3 flex items-start gap-3">
+                <ShieldAlert className="h-5 w-5 text-red-600 dark:text-red-400 mt-0.5 shrink-0" />
+                <div>
+                  <p className="text-sm font-medium text-red-800 dark:text-red-200">Bot desactivado por el administrador</p>
+                  <p className="text-xs text-red-600 dark:text-red-400 mt-1">
+                    El administrador ha desactivado tu bot. No puedes reactivarlo hasta que el administrador lo habilite nuevamente. Contacta a soporte si necesitas asistencia.
+                  </p>
+                </div>
+              </div>
+            )}
           </div>
         </CardContent>
       </Card>
 
-      <Tabs defaultValue="business" className="space-y-4">
-        <TabsList className={`grid w-full ${(config.tools_config.business_type === "clinic" || config.tools_config.business_type === "salon") ? "grid-cols-5" : "grid-cols-4"}`}>
+      <Tabs defaultValue="control" className="space-y-4">
+        <TabsList className={`grid w-full ${(config.tools_config.business_type === "clinic" || config.tools_config.business_type === "salon") ? "grid-cols-6" : "grid-cols-5"}`}>
+          <TabsTrigger value="control">
+            <CalendarClock className="h-4 w-4 mr-2" />
+            Control
+          </TabsTrigger>
           <TabsTrigger value="business">
             <Building2 className="h-4 w-4 mr-2" />
             Negocio
@@ -641,6 +710,216 @@ export default function BotConfigPage() {
             Email
           </TabsTrigger>
         </TabsList>
+
+        {/* Control Tab */}
+        <TabsContent value="control" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Bot className="h-5 w-5" />
+                Estado del Bot
+              </CardTitle>
+              <CardDescription>
+                Enciende o apaga tu bot. Cuando está apagado, no responderá a los mensajes.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-center justify-between rounded-lg border border-border p-4">
+                <div>
+                  <Label htmlFor="bot-active-control" className="font-medium">Bot Encendido</Label>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {config.is_active
+                      ? "El bot está respondiendo mensajes normalmente."
+                      : "El bot está apagado y no responderá mensajes."}
+                  </p>
+                </div>
+                <div className="flex items-center gap-3">
+                  <Switch
+                    id="bot-active-control"
+                    checked={config.is_active}
+                    disabled={config.bot_disabled_by_admin}
+                    onCheckedChange={(checked) =>
+                      setConfig({ ...config, is_active: checked })
+                    }
+                  />
+                  <Badge
+                    variant="outline"
+                    className={
+                      config.is_active
+                        ? "bg-green-50 text-green-700 border-green-200 dark:bg-green-950/30 dark:text-green-400 dark:border-green-800"
+                        : "bg-red-50 text-red-700 border-red-200 dark:bg-red-950/30 dark:text-red-400 dark:border-red-800"
+                    }
+                  >
+                    {config.is_active ? "Encendido" : "Apagado"}
+                  </Badge>
+                </div>
+              </div>
+
+              {config.bot_disabled_by_admin && (
+                <div className="rounded-lg border border-red-200 dark:border-red-900/50 bg-red-50 dark:bg-red-950/30 p-3 flex items-start gap-3">
+                  <ShieldAlert className="h-5 w-5 text-red-600 dark:text-red-400 mt-0.5 shrink-0" />
+                  <div>
+                    <p className="text-sm font-medium text-red-800 dark:text-red-200">Bloqueado por el administrador</p>
+                    <p className="text-xs text-red-600 dark:text-red-400 mt-1">
+                      El administrador ha desactivado tu bot. No puedes reactivarlo. Contacta a soporte.
+                    </p>
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <CalendarClock className="h-5 w-5" />
+                Horario Programado del Bot
+              </CardTitle>
+              <CardDescription>
+                Opcional: programa un horario para que el bot funcione solo en cierto rango de horas. Fuera de ese horario puedes elegir que no responda o que envíe un mensaje personalizado.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-center justify-between rounded-lg border border-border p-4">
+                <div>
+                  <Label htmlFor="schedule-enabled" className="font-medium">Activar horario programado</Label>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Si está activo, el bot solo responderá dentro del horario definido.
+                  </p>
+                </div>
+                <Switch
+                  id="schedule-enabled"
+                  checked={config.tools_config.bot_schedule_enabled || false}
+                  onCheckedChange={(checked) =>
+                    setConfig({
+                      ...config,
+                      tools_config: {
+                        ...config.tools_config,
+                        bot_schedule_enabled: checked,
+                      },
+                    })
+                  }
+                />
+              </div>
+
+              {config.tools_config.bot_schedule_enabled && (
+                <>
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <div className="space-y-2">
+                      <Label>Hora de inicio</Label>
+                      <Input
+                        type="time"
+                        value={config.tools_config.bot_schedule_start || "08:00"}
+                        onChange={(e) =>
+                          setConfig({
+                            ...config,
+                            tools_config: {
+                              ...config.tools_config,
+                              bot_schedule_start: e.target.value,
+                            },
+                          })
+                        }
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Hora de fin</Label>
+                      <Input
+                        type="time"
+                        value={config.tools_config.bot_schedule_end || "18:00"}
+                        onChange={(e) =>
+                          setConfig({
+                            ...config,
+                            tools_config: {
+                              ...config.tools_config,
+                              bot_schedule_end: e.target.value,
+                            },
+                          })
+                        }
+                      />
+                    </div>
+                  </div>
+
+                  <Separator />
+
+                  <div className="space-y-3">
+                    <Label>Comportamiento fuera de horario</Label>
+                    <div className="space-y-2">
+                      <label className="flex items-start gap-3 cursor-pointer rounded-lg border border-border p-3 hover:bg-muted/50 transition-colors">
+                        <input
+                          type="radio"
+                          name="out_of_hours_mode"
+                          checked={(config.tools_config.bot_out_of_hours_mode || "off") === "off"}
+                          onChange={() =>
+                            setConfig({
+                              ...config,
+                              tools_config: {
+                                ...config.tools_config,
+                                bot_out_of_hours_mode: "off",
+                              },
+                            })
+                          }
+                          className="mt-1"
+                        />
+                        <div>
+                          <span className="text-sm font-medium">No responder</span>
+                          <p className="text-xs text-muted-foreground mt-0.5">
+                            El bot simplemente no responderá los mensajes fuera de horario.
+                          </p>
+                        </div>
+                      </label>
+                      <label className="flex items-start gap-3 cursor-pointer rounded-lg border border-border p-3 hover:bg-muted/50 transition-colors">
+                        <input
+                          type="radio"
+                          name="out_of_hours_mode"
+                          checked={config.tools_config.bot_out_of_hours_mode === "message"}
+                          onChange={() =>
+                            setConfig({
+                              ...config,
+                              tools_config: {
+                                ...config.tools_config,
+                                bot_out_of_hours_mode: "message",
+                              },
+                            })
+                          }
+                          className="mt-1"
+                        />
+                        <div>
+                          <span className="text-sm font-medium">Enviar mensaje de fuera de horario</span>
+                          <p className="text-xs text-muted-foreground mt-0.5">
+                            El bot enviará un mensaje personalizado indicando que está fuera de horario.
+                          </p>
+                        </div>
+                      </label>
+                    </div>
+                  </div>
+
+                  {config.tools_config.bot_out_of_hours_mode === "message" && (
+                    <div className="space-y-2">
+                      <Label>Mensaje fuera de horario</Label>
+                      <Textarea
+                        placeholder="Ej: Gracias por tu mensaje. Nuestro horario de atención es de 8:00 AM a 6:00 PM. Te responderemos lo antes posible."
+                        value={config.tools_config.bot_out_of_hours_message || ""}
+                        onChange={(e) =>
+                          setConfig({
+                            ...config,
+                            tools_config: {
+                              ...config.tools_config,
+                              bot_out_of_hours_message: e.target.value,
+                            },
+                          })
+                        }
+                        rows={3}
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        Este mensaje se enviará automáticamente cuando alguien escriba fuera del horario programado.
+                      </p>
+                    </div>
+                  )}
+                </>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
 
         {/* Business Tab */}
         <TabsContent value="business" className="space-y-4">
