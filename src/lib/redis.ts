@@ -1,7 +1,13 @@
 import { createClient } from "redis"
 
+const redisUrl = process.env.REDIS_URL || "redis://localhost:6379"
+const connectTimeoutMs = parseFloat(process.env.REDIS_CONNECT_TIMEOUT_SECONDS ?? "3") * 1000
+
 const redisClient = createClient({
-    url: process.env.REDIS_URL || "redis://localhost:6379",
+    url: redisUrl,
+    socket: {
+        connectTimeout: connectTimeoutMs,
+    },
 })
 
 redisClient.on("error", (err) => console.error("Redis Client Error", err))

@@ -20,7 +20,7 @@ Panel de administración completo para gestionar conversaciones de WhatsApp, cit
 - **Shadcn UI** - Componentes UI
 - **WhatsApp Business API** - Integración con WhatsApp
 
-## 📋 Requisitos Previos
+## 📋 Requisitos Previoss
 
 - Node.js 18+ 
 - PostgreSQL
