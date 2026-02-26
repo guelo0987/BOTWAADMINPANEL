@@ -144,8 +144,14 @@ export async function PUT(req: Request) {
             // Normalizar tools_config antes de validar para corregir datos legacy (ej: working_days=0 -> 7)
             normalizedToolsConfig = normalizeToolsConfig(tools_config as ToolsConfig)
 
-            const validationErrors = validateToolsConfig(normalizedToolsConfig)
+            // Validar con allowMissingCalendarId=true para permitir guardar configs incompletas en el panel
+            // (el bot validará en runtime si necesita el calendar_id)
+            const validationErrors = validateToolsConfig(normalizedToolsConfig, {
+                allowMissingCalendarId: true
+            })
+
             if (validationErrors.length > 0) {
+                console.error("Validation errors on save:", validationErrors)
                 return NextResponse.json(
                     {
                         error: "Validation failed",
