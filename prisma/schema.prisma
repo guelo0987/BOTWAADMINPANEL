@@ -1,9 +1,3 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -13,17 +7,10 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// Matches existing Postgres enum: CREATE TYPE roles AS ENUM ('admin', 'empleado');
-enum roles {
-  admin
-  empleado
-}
-
-// Matches existing table: public.users
 model User {
-  id         Int    @id
-  username   String @db.VarChar(20) @map("user")
-  password   String @db.VarChar(220)
+  id         Int       @id
+  username   String    @map("user") @db.VarChar(20)
+  password   String    @db.VarChar(220)
   created_at DateTime? @default(now()) @db.Date
   updated_at DateTime? @default(now()) @db.Date
   rol        roles?
@@ -32,55 +19,49 @@ model User {
 }
 
 model Client {
-  id                     Int      @id @default(autoincrement())
+  id                     Int                  @id @default(autoincrement())
   business_name          String
-  whatsapp_instance_id   String   @unique
+  whatsapp_instance_id   String               @unique
+  is_active              Boolean              @default(true)
+  system_prompt_template String
+  tools_config           Json?                @default("{}")
+  created_at             DateTime             @default(now())
   password_hash          String
-  is_active              Boolean  @default(true)
-  bot_disabled_by_admin  Boolean  @default(false)
-  system_prompt_template String   @db.Text
-  tools_config           Json?    @default("{}")
-  created_at             DateTime @default(now())
-
-  // Multi-tenant WhatsApp (per-client credentials)
   whatsapp_access_token  String?
   whatsapp_app_secret    String?
-  whatsapp_api_version   String?  @default("v21.0")
-
-  // Relations
-  customers         Customer[]
-  appointments      Appointment[]
-  email_settings    ClientEmailSettings?
+  whatsapp_api_version   String?              @default("v21.0")
+  bot_disabled_by_admin  Boolean              @default(false)
+  notification_email     String?              @db.VarChar
+  appointments           Appointment[]
+  email_settings         ClientEmailSettings?
+  customers              Customer[]
 
   @@map("clients")
 }
 
 model ClientEmailSettings {
-  id            Int     @id @default(autoincrement())
-  client_id     Int     @unique
-  primary_color String  @default("#333333") @db.VarChar(50)
-  secondary_color String @default("#666666") @db.VarChar(50)
-  logo_url      String?
-  sender_name   String?
-  footer_text   String?
-  templates     Json?   @default("{}")
-
-  client Client @relation(fields: [client_id], references: [id], onDelete: Cascade)
+  id              Int     @id @default(autoincrement())
+  client_id       Int     @unique
+  primary_color   String  @default("#333333") @db.VarChar(50)
+  secondary_color String  @default("#666666") @db.VarChar(50)
+  logo_url        String?
+  sender_name     String?
+  footer_text     String?
+  templates       Json?   @default("{}")
+  client          Client  @relation(fields: [client_id], references: [id], onDelete: Cascade)
 
   @@map("client_email_settings")
 }
 
 model Customer {
-  id           Int      @id @default(autoincrement())
+  id           Int           @id @default(autoincrement())
   client_id    Int
   phone_number String
   full_name    String?
-  data         Json?    @default("{}")
-  created_at   DateTime @default(now())
-
-  // Relations
-  client       Client        @relation(fields: [client_id], references: [id])
+  data         Json?         @default("{}")
+  created_at   DateTime      @default(now())
   appointments Appointment[]
+  client       Client        @relation(fields: [client_id], references: [id])
 
   @@index([client_id])
   @@index([phone_number])
@@ -95,13 +76,16 @@ model Appointment {
   start_time      DateTime
   end_time        DateTime
   status          String   @default("CONFIRMED")
-  notes           String?  @db.Text
-
-  // Relations
-  client   Client   @relation(fields: [client_id], references: [id])
-  customer Customer @relation(fields: [customer_id], references: [id])
+  notes           String?
+  client          Client   @relation(fields: [client_id], references: [id])
+  customer        Customer @relation(fields: [customer_id], references: [id])
 
   @@index([client_id])
   @@index([customer_id])
   @@map("appointments")
+}
+
+enum roles {
+  admin
+  empleado
 }

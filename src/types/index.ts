@@ -15,6 +15,8 @@ export interface Client {
   whatsapp_app_secret?: string | null
   /** Multi-tenant: versión de la API (ej: v21.0) */
   whatsapp_api_version?: string | null
+  /** Correo para notificaciones del cliente */
+  notification_email?: string | null
 }
 
 /**

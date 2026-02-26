@@ -100,10 +100,10 @@ export async function POST(req: Request) {
     await requireAdminRole("admin")
 
     const body = await req.json()
-    const { business_name, whatsapp_instance_id, password, business_type, system_prompt_template, tools_config } = body
+    const { business_name, whatsapp_instance_id, notification_email, password, business_type, system_prompt_template, tools_config } = body
 
-    if (!business_name || !whatsapp_instance_id || !password) {
-      return NextResponse.json({ error: "Faltan campos requeridos" }, { status: 400 })
+    if (!business_name || !whatsapp_instance_id || !notification_email || !password) {
+      return NextResponse.json({ error: "Faltan campos requeridos: business_name, whatsapp_instance_id, notification_email, password" }, { status: 400 })
     }
 
     const bt: ToolsConfig["business_type"] = business_type || "general"
@@ -125,6 +125,7 @@ export async function POST(req: Request) {
       data: {
         business_name,
         whatsapp_instance_id,
+        notification_email,
         password_hash: hashedPassword,
         system_prompt_template: system_prompt_template || defaultPromptForType(bt),
         is_active: true,

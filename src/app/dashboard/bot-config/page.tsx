@@ -468,6 +468,7 @@ export default function BotConfigPage() {
           business_name: latest.business_name,
           whatsapp_instance_id: latest.whatsapp_instance_id,
           is_active: latest.is_active,
+          notification_email: latest.notification_email ?? null,
           system_prompt_template: latest.system_prompt_template,
           tools_config: latest.tools_config,
           whatsapp_access_token: latest.whatsapp_access_token ?? null,
@@ -638,6 +639,11 @@ export default function BotConfigPage() {
                   <p className="text-sm text-muted-foreground">
                     ID: {config.whatsapp_instance_id}
                   </p>
+                  {config.notification_email && (
+                    <p className="text-sm text-muted-foreground">
+                      Correo: {config.notification_email}
+                    </p>
+                  )}
                 </div>
               </div>
               <div className="flex items-center gap-3">
@@ -955,6 +961,23 @@ export default function BotConfigPage() {
                   />
                   <p className="text-xs text-muted-foreground">
                     ID del número de WhatsApp en Meta (Phone Number ID)
+                  </p>
+                </div>
+                <div className="space-y-2 md:col-span-2">
+                  <Label>Correo de notificaciones</Label>
+                  <Input
+                    type="email"
+                    value={config.notification_email ?? ""}
+                    onChange={(e) =>
+                      setConfig({
+                        ...config,
+                        notification_email: e.target.value || null,
+                      })
+                    }
+                    placeholder="contacto@negocio.com"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Correo para recibir notificaciones (configurado por el administrador al crear la cuenta)
                   </p>
                 </div>
               </div>

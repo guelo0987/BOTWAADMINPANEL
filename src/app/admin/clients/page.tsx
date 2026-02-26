@@ -70,6 +70,7 @@ export default function AdminClientsPage() {
   const [openCreate, setOpenCreate] = useState(false)
   const [businessName, setBusinessName] = useState("")
   const [instanceId, setInstanceId] = useState("")
+  const [notificationEmail, setNotificationEmail] = useState("")
   const [password, setPassword] = useState("")
   const [businessType, setBusinessType] = useState<BusinessType>("general")
   const [timezone, setTimezone] = useState("America/Santo_Domingo")
@@ -143,6 +144,7 @@ export default function AdminClientsPage() {
       const payload = {
         business_name: businessName,
         whatsapp_instance_id: instanceId,
+        notification_email: notificationEmail,
         password,
         business_type: businessType,
         system_prompt_template: prompt || undefined,
@@ -170,6 +172,7 @@ export default function AdminClientsPage() {
       setOpenCreate(false)
       setBusinessName("")
       setInstanceId("")
+      setNotificationEmail("")
       setPassword("")
       setBusinessType("general")
       setTimezone("America/Santo_Domingo")
@@ -387,6 +390,20 @@ export default function AdminClientsPage() {
                 </div>
 
                 <div className="grid gap-2">
+                  <Label htmlFor="notification_email">Correo de notificaciones</Label>
+                  <Input
+                    id="notification_email"
+                    type="email"
+                    value={notificationEmail}
+                    onChange={(e) => setNotificationEmail(e.target.value)}
+                    placeholder="contacto@negocio.com"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Correo para notificaciones del cliente (obligatorio)
+                  </p>
+                </div>
+
+                <div className="grid gap-2">
                   <Label htmlFor="password">Contraseña</Label>
                   <Input
                     id="password"
@@ -422,7 +439,7 @@ export default function AdminClientsPage() {
               <DialogFooter>
                 <Button
                   onClick={createClient}
-                  disabled={isCreating || !businessName || !instanceId || !password}
+                  disabled={isCreating || !businessName || !instanceId || !notificationEmail || !password}
                 >
                   {isCreating ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
                   Crear
