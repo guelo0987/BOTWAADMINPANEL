@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import prisma from "@/lib/db"
 import { getServerUser } from "@/lib/auth-server"
 import { validateToolsConfig, normalizeToolsConfig } from "@/lib/validate-tools-config"
+import { ToolsConfig } from "@/types"
 
 // GET - Obtener configuración del cliente autenticado
 export async function GET(req: Request) {
@@ -55,9 +56,12 @@ export async function GET(req: Request) {
             ? client.tools_config
             : (client.tools_config ? JSON.parse(client.tools_config as string) : {})
 
+        // Normalizar tools_config antes de enviar al cliente (para que reciba datos limpios)
+        const normalizedToolsConfig = normalizeToolsConfig(toolsConfig as ToolsConfig)
+
         return NextResponse.json({
             ...client,
-            tools_config: toolsConfig,
+            tools_config: normalizedToolsConfig,
         })
     } catch (error: any) {
         console.error("Error fetching client config:", error)
@@ -135,9 +139,12 @@ export async function PUT(req: Request) {
         }
 
         // Validar y normalizar tools_config si se está actualizando
-        let normalizedToolsConfig = tools_config
+        let normalizedToolsConfig = tools_config as ToolsConfig
         if (tools_config) {
-            const validationErrors = validateToolsConfig(tools_config)
+            // Normalizar tools_config antes de validar para corregir datos legacy (ej: working_days=0 -> 7)
+            normalizedToolsConfig = normalizeToolsConfig(tools_config as ToolsConfig)
+
+            const validationErrors = validateToolsConfig(normalizedToolsConfig)
             if (validationErrors.length > 0) {
                 return NextResponse.json(
                     {
@@ -147,9 +154,6 @@ export async function PUT(req: Request) {
                     { status: 400 }
                 )
             }
-
-            // Normalizar tools_config antes de guardar
-            normalizedToolsConfig = normalizeToolsConfig(tools_config)
         }
 
         const updatedClient = await prisma.client.update({
