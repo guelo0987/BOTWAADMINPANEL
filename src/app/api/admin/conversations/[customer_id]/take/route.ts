@@ -18,7 +18,7 @@ export async function POST(
         }
 
         const body = await req.json().catch(() => ({}))
-        const { client_id, admin_name = "Agente" } = body
+        const { client_id, admin_name } = body
         const { customer_id } = await params
 
         if (!client_id) {
@@ -32,6 +32,12 @@ export async function POST(
         if (clientIdNum !== user.id) {
             return NextResponse.json({ error: "Forbidden" }, { status: 403 })
         }
+
+        const client = await prisma.client.findUnique({
+            where: { id: clientIdNum },
+            select: { business_name: true },
+        })
+        const senderName = admin_name || client?.business_name || "Agente"
 
         const customer = await prisma.customer.findFirst({
             where: {
@@ -49,7 +55,7 @@ export async function POST(
 
         const cleanPhone = customer.phone_number.replace(/[+\s-()]/g, "")
         const memory = new ConversationMemory(clientIdNum, cleanPhone)
-        await memory.setHumanHandled(true, admin_name)
+        await memory.setHumanHandled(true, senderName)
 
         return NextResponse.json({
             success: true,

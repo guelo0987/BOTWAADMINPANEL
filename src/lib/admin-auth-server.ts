@@ -2,7 +2,7 @@ import { cookies } from "next/headers"
 import jwt from "jsonwebtoken"
 import prisma from "@/lib/db"
 
-const JWT_SECRET = process.env.JWT_SECRET || "fallback_secret_do_not_use_in_prod"
+import { JWT_SECRET_OR_FALLBACK } from "@/lib/jwt"
 
 export type AdminRole = "admin" | "empleado"
 
@@ -19,7 +19,7 @@ export async function getAdminServerUser(): Promise<AdminAuthUser | null> {
 
     if (!token) return null
 
-    const decoded = jwt.verify(token, JWT_SECRET) as { id: number }
+    const decoded = jwt.verify(token, JWT_SECRET_OR_FALLBACK) as { id: number }
 
     const user = await prisma.user.findUnique({
       where: { id: decoded.id },

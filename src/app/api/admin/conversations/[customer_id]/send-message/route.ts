@@ -15,7 +15,7 @@ export async function POST(
         }
 
         const body = await req.json()
-        const { client_id, message, admin_name = "Agente" } = body
+        const { client_id, message, admin_name } = body
         const { customer_id } = await params
 
         if (!client_id || !message) {
@@ -44,13 +44,39 @@ export async function POST(
             )
         }
 
-        // ⚠️ FORMATO DE NÚMERO (sin +, sin espacios)
+        const client = await prisma.client.findUnique({
+            where: { id: clientIdNum },
+            select: {
+                business_name: true,
+                whatsapp_instance_id: true,
+                whatsapp_access_token: true,
+                whatsapp_api_version: true,
+            },
+        })
+
+        if (!client?.whatsapp_access_token || !client?.whatsapp_instance_id) {
+            return NextResponse.json(
+                {
+                    error: "Este cliente no tiene configuradas las credenciales de WhatsApp. Configura whatsapp_instance_id y whatsapp_access_token en Configuración del Bot.",
+                },
+                { status: 400 }
+            )
+        }
+
         const cleanPhone = customer.phone_number.replace(/[+\s-()]/g, "")
 
-        // ⚠️ ENVIAR A WHATSAPP PRIMERO
         let whatsappResponse
         try {
-            whatsappResponse = await sendWhatsAppMessage(cleanPhone, message, clientIdNum)
+            whatsappResponse = await sendWhatsAppMessage(
+                cleanPhone,
+                message,
+                {
+                    phoneNumberId: client.whatsapp_instance_id,
+                    accessToken: client.whatsapp_access_token,
+                    apiVersion: client.whatsapp_api_version ?? undefined,
+                },
+                clientIdNum
+            )
             
             // Verificar que realmente se envió
             if (!whatsappResponse.messages?.[0]?.id) {
@@ -70,14 +96,12 @@ export async function POST(
         // ⚠️ SOLO SI WHATSAPP RESPONDE OK, ACTUALIZAR REDIS
         const messageId = whatsappResponse.messages[0].id
 
+        const senderName = admin_name || client.business_name || "Agente"
+
         try {
             const memory = new ConversationMemory(clientIdNum, cleanPhone)
-            
-            // Marcar como manejada por humano
-            await memory.setHumanHandled(true, admin_name)
-            
-            // Guardar mensaje en historial
-            await memory.addHumanMessage(message, admin_name)
+            await memory.setHumanHandled(true, senderName)
+            await memory.addHumanMessage(message, senderName)
         } catch (redisError) {
             // ⚠️ ERROR EN REDIS PERO MENSAJE YA ENVIADO A WHATSAPP
             // No fallar porque el mensaje ya se envió, pero informar

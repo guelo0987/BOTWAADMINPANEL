@@ -1,13 +1,10 @@
 import React from "react"
 import type { Metadata, Viewport } from "next"
-import { Inter } from "next/font/google"
 import { Analytics } from "@vercel/analytics/next"
 import { AuthProvider } from "@/lib/auth-context"
 import { AdminAuthProvider } from "@/lib/admin-auth-context"
 import { Toaster } from "@/components/ui/sonner"
 import "./globals.css"
-
-const _inter = Inter({ subsets: ["latin"] })
 
 export const metadata: Metadata = {
   title: "CompleteAgent - Asistentes Virtuales con IA para WhatsApp",

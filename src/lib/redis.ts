@@ -1,10 +1,14 @@
 import { createClient } from "redis"
 
-const redisUrl = process.env.REDIS_URL || "redis://localhost:6379"
+const redisUrl = process.env.REDIS_URL
+if (!redisUrl && process.env.NODE_ENV === "production") {
+  throw new Error("REDIS_URL debe estar definido en producción. Configura la variable de entorno.")
+}
+const redisUrlOrFallback = redisUrl || "redis://localhost:6379"
 const connectTimeoutMs = parseFloat(process.env.REDIS_CONNECT_TIMEOUT_SECONDS ?? "3") * 1000
 
 const redisClient = createClient({
-    url: redisUrl,
+    url: redisUrlOrFallback,
     socket: {
         connectTimeout: connectTimeoutMs,
     },

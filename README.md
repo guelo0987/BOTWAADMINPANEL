@@ -45,15 +45,14 @@ npm install
 cp .env.example .env
 ```
 
-Edita `.env` con tus credenciales:
+Edita `.env` con tus credenciales (ver `.env.example` para la lista completa):
 ```env
 DATABASE_URL="postgresql://user:password@localhost:5432/dbname"
 JWT_SECRET="tu-secret-key"
-WHATSAPP_ACCESS_TOKEN="tu-access-token"
-WHATSAPP_PHONE_NUMBER_ID="tu-phone-number-id"
-WHATSAPP_API_VERSION="v21.0"
 REDIS_URL="redis://localhost:6379"
+WHATSAPP_VERIFY_TOKEN="token-para-verificar-webhook"
 ```
+Las credenciales de WhatsApp por cliente (access_token, phone_number_id) se configuran en la BD por cada cliente (multi-tenant).
 
 4. Configura la base de datos:
 ```bash

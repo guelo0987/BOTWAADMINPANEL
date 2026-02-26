@@ -178,12 +178,14 @@ function ConversationDetail({
   open,
   onClose,
   clientId,
+  businessName,
   onRefresh,
 }: {
   conversation: Conversation | null
   open: boolean
   onClose: () => void
   clientId?: number
+  businessName?: string
   onRefresh?: () => void
 }) {
   const [newMessage, setNewMessage] = useState("")
@@ -257,10 +259,10 @@ function ConversationDetail({
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
+            body: JSON.stringify({
             client_id: clientId,
             message: newMessage,
-            admin_name: "Admin", // TODO: Obtener del usuario autenticado
+            admin_name: businessName,
           }),
         }
       )
@@ -343,7 +345,7 @@ function ConversationDetail({
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             client_id: clientId,
-            admin_name: "Agente",
+            admin_name: businessName,
           }),
         }
       )
@@ -767,6 +769,7 @@ export default function ConversationsPage() {
         open={sheetOpen}
         onClose={() => setSheetOpen(false)}
         clientId={user?.id}
+        businessName={user?.business_name}
         onRefresh={loadConversations}
       />
     </div>

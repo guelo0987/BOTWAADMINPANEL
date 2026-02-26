@@ -3,7 +3,7 @@ import { Client } from "@prisma/client"
 import bcrypt from "bcryptjs"
 import jwt from "jsonwebtoken"
 
-const JWT_SECRET = process.env.JWT_SECRET || "fallback_secret_do_not_use_in_prod"
+import { JWT_SECRET_OR_FALLBACK } from "@/lib/jwt"
 
 export const registerClient = async (data: {
     business_name: string
@@ -34,7 +34,7 @@ export const registerClient = async (data: {
 
     const token = jwt.sign(
         { id: newClient.id, business_name: newClient.business_name },
-        JWT_SECRET,
+        JWT_SECRET_OR_FALLBACK,
         { expiresIn: "7d" }
     )
 
@@ -93,7 +93,7 @@ export const authenticateClient = async (
 
     const token = jwt.sign(
         { id: client.id, business_name: client.business_name },
-        JWT_SECRET,
+        JWT_SECRET_OR_FALLBACK,
         { expiresIn: "7d" }
     )
 

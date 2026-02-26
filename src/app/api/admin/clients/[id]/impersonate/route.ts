@@ -3,7 +3,7 @@ import prisma from "@/lib/db"
 import jwt from "jsonwebtoken"
 import { requireAdminRole } from "@/lib/admin-auth-server"
 
-const JWT_SECRET = process.env.JWT_SECRET || "fallback_secret_do_not_use_in_prod"
+import { JWT_SECRET_OR_FALLBACK } from "@/lib/jwt"
 
 export async function POST(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -25,7 +25,7 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
       return NextResponse.json({ error: "Cliente no encontrado" }, { status: 404 })
     }
 
-    const token = jwt.sign({ id: client.id, business_name: client.business_name }, JWT_SECRET, {
+    const token = jwt.sign({ id: client.id, business_name: client.business_name }, JWT_SECRET_OR_FALLBACK, {
       expiresIn: "7d",
     })
 

@@ -2,7 +2,7 @@ import prisma from "@/lib/db"
 import bcrypt from "bcryptjs"
 import jwt from "jsonwebtoken"
 
-const JWT_SECRET = process.env.JWT_SECRET || "fallback_secret_do_not_use_in_prod"
+import { JWT_SECRET_OR_FALLBACK } from "@/lib/jwt"
 
 export type AdminRole = "admin" | "empleado"
 
@@ -68,7 +68,7 @@ export async function authenticateAdmin(
 
   const token = jwt.sign(
     { id: dbUser.id, username: dbUser.username, rol: dbUser.rol },
-    JWT_SECRET,
+    JWT_SECRET_OR_FALLBACK,
     { expiresIn: "7d" }
   )
 

@@ -2,7 +2,7 @@ import { cookies } from "next/headers"
 import jwt from "jsonwebtoken"
 import prisma from "@/lib/db"
 
-const JWT_SECRET = process.env.JWT_SECRET || "fallback_secret_do_not_use_in_prod"
+import { JWT_SECRET_OR_FALLBACK } from "@/lib/jwt"
 
 export interface AuthUser {
     id: number
@@ -23,7 +23,7 @@ export async function getServerUser(): Promise<AuthUser | null> {
             return null
         }
 
-        const decoded = jwt.verify(token, JWT_SECRET) as { id: number; business_name: string }
+        const decoded = jwt.verify(token, JWT_SECRET_OR_FALLBACK) as { id: number; business_name: string }
 
         // Obtener cliente completo desde la BD
         const client = await prisma.client.findUnique({
