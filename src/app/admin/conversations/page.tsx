@@ -88,9 +88,19 @@ export default function AdminConversationsPage() {
     loadClients()
   }, [])
 
-  const loadConversations = async (clientId: string) => {
+  useEffect(() => {
+    if (!selectedClient) return
+
+    const interval = setInterval(() => {
+      loadConversations(selectedClient, true)
+    }, 10000)
+
+    return () => clearInterval(interval)
+  }, [selectedClient])
+
+  const loadConversations = async (clientId: string, silent = false) => {
     if (!clientId) return
-    setIsLoadingConvs(true)
+    if (!silent) setIsLoadingConvs(true)
     try {
       const res = await fetch(`/api/admin/conversations?client_id=${clientId}`, {
         credentials: "include",
@@ -117,7 +127,7 @@ export default function AdminConversationsPage() {
       toast.error(e instanceof Error ? e.message : "Error")
       setConversations([])
     } finally {
-      setIsLoadingConvs(false)
+      if (!silent) setIsLoadingConvs(false)
     }
   }
 

@@ -134,12 +134,12 @@ function MessageBubble({ message }: { message: Message }) {
     >
       <div
         className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${isBot
-            ? "bg-primary/10 text-primary"
-            : isAgent
-              ? "bg-blue-500/10 text-blue-600"
-              : isCustomer
-                ? "bg-muted text-muted-foreground"
-                : "bg-warning/10 text-warning-foreground"
+          ? "bg-primary/10 text-primary"
+          : isAgent
+            ? "bg-blue-500/10 text-blue-600"
+            : isCustomer
+              ? "bg-muted text-muted-foreground"
+              : "bg-warning/10 text-warning-foreground"
           }`}
       >
         {isBot ? (
@@ -152,10 +152,10 @@ function MessageBubble({ message }: { message: Message }) {
       </div>
       <div
         className={`max-w-[70%] rounded-2xl px-4 py-2 ${isCustomer
-            ? "bg-primary text-primary-foreground rounded-tr-none"
-            : isAgent
-              ? "bg-blue-500/10 text-blue-600 border border-blue-500/20 rounded-tl-none"
-              : "bg-muted rounded-tl-none"
+          ? "bg-primary text-primary-foreground rounded-tr-none"
+          : isAgent
+            ? "bg-blue-500/10 text-blue-600 border border-blue-500/20 rounded-tl-none"
+            : "bg-muted rounded-tl-none"
           }`}
       >
         {isAgent && (
@@ -199,21 +199,27 @@ function ConversationDetail({
   useEffect(() => {
     if (open && conversation && clientId) {
       loadMessages()
+
+      const interval = setInterval(() => {
+        loadMessages(true)
+      }, 5000)
+
+      return () => clearInterval(interval)
     }
   }, [open, conversation?.customer_id, clientId])
 
-  const loadMessages = async () => {
+  const loadMessages = async (silent = false) => {
     if (!conversation?.customer_id || !clientId) return
 
     try {
-      setIsLoadingMessages(true)
+      if (!silent) setIsLoadingMessages(true)
       const response = await fetch(
         `/api/admin/conversations/${conversation.customer_id}/history?client_id=${clientId}`
       )
       if (!response.ok) throw new Error("Failed to load messages")
-      
+
       const data = await response.json()
-      
+
       // Convertir mensajes del formato Redis al formato Message
       const formattedMessages: Message[] = data.messages.map((msg: any, index: number) => {
         // Determinar el sender basado en role y human flag
@@ -234,7 +240,7 @@ function ConversationDetail({
           timestamp: msg.timestamp || new Date().toISOString(),
         }
       })
-      
+
       setMessages(formattedMessages)
       setConversationStatus(data.status.status)
     } catch (error) {
@@ -245,7 +251,7 @@ function ConversationDetail({
         variant: "destructive",
       })
     } finally {
-      setIsLoadingMessages(false)
+      if (!silent) setIsLoadingMessages(false)
     }
   }
 
@@ -259,7 +265,7 @@ function ConversationDetail({
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
+          body: JSON.stringify({
             client_id: clientId,
             message: newMessage,
             admin_name: businessName,
@@ -276,7 +282,7 @@ function ConversationDetail({
       setConversationStatus("human_handled")
       await loadMessages() // Recargar mensajes
       onRefresh?.() // Refrescar lista de conversaciones
-      
+
       toast({
         title: "Mensaje enviado",
         description: "El mensaje se envió correctamente",
@@ -319,7 +325,7 @@ function ConversationDetail({
 
       setConversationStatus("escalated")
       onRefresh?.()
-      
+
       toast({
         title: "Conversación escalada",
         description: "La conversación ha sido marcada como escalada",
@@ -398,7 +404,7 @@ function ConversationDetail({
 
       setConversationStatus(resumeAI ? "active" : "resolved")
       onRefresh?.()
-      
+
       toast({
         title: "Conversación resuelta",
         description: resumeAI ? "La IA ha sido reanudada" : "La conversación ha sido marcada como resuelta",
@@ -560,6 +566,12 @@ export default function ConversationsPage() {
   // Cargar conversaciones
   useEffect(() => {
     loadConversations()
+
+    const interval = setInterval(() => {
+      loadConversations(true)
+    }, 10000)
+
+    return () => clearInterval(interval)
   }, [user?.id, statusFilter])
 
   // Abrir conversación desde ?open=customer_id (ej: desde Clientes)
@@ -575,18 +587,18 @@ export default function ConversationsPage() {
     }
   }, [searchParams, conversations])
 
-  const loadConversations = async () => {
+  const loadConversations = async (silent = false) => {
     if (!user?.id) return
 
     try {
-      setIsLoading(true)
+      if (!silent) setIsLoading(true)
       const response = await fetch(
         `/api/admin/conversations?client_id=${user.id}${statusFilter !== "all" ? `&status_filter=${statusFilter}` : ""}`
       )
       if (!response.ok) throw new Error("Failed to load conversations")
-      
+
       const data = await response.json()
-      
+
       // Mapear a formato Conversation con id
       const formattedConversations: Conversation[] = data.conversations.map((conv: any, index: number) => ({
         id: index + 1,
@@ -603,7 +615,7 @@ export default function ConversationsPage() {
         admin: conv.admin,
         escalation_reason: conv.escalation_reason,
       }))
-      
+
       setConversations(formattedConversations)
       setStats({
         active: data.active || 0,
@@ -619,7 +631,7 @@ export default function ConversationsPage() {
         variant: "destructive",
       })
     } finally {
-      setIsLoading(false)
+      if (!silent) setIsLoading(false)
     }
   }
 

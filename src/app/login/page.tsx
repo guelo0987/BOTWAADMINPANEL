@@ -65,15 +65,12 @@ export default function LoginPage() {
               <Input
                 id="whatsapp_instance_id"
                 type="text"
-                placeholder="clinica_moreira"
+                placeholder="ID de Instancia"
                 value={whatsappInstanceId}
                 onChange={(e) => setWhatsappInstanceId(e.target.value)}
                 required
                 disabled={isSubmitting}
               />
-              <p className="text-xs text-muted-foreground">
-                Ejemplo: clinica_moreira, pizzeria_dominicana
-              </p>
             </div>
 
             <div className="space-y-2">
@@ -120,24 +117,15 @@ export default function LoginPage() {
             </Button>
 
             <p className="text-center text-sm text-muted-foreground">
-              <button type="button" className="text-primary hover:underline">
+              <button
+                type="button"
+                className="text-primary hover:underline"
+                onClick={() => alert("Por favor, contacte al administrador para recuperar su contraseña.")}
+              >
                 ¿Olvidaste tu contraseña?
               </button>
             </p>
           </form>
-
-          {/* Demo credentials info */}
-          <div className="mt-6 p-4 rounded-lg bg-muted/50 border border-border">
-            <p className="text-xs font-medium text-muted-foreground mb-2">
-              Credenciales de demostración:
-            </p>
-            <p className="text-xs text-muted-foreground font-mono">
-              ID Instancia: clinica_moreira
-            </p>
-            <p className="text-xs text-muted-foreground font-mono">
-              Contraseña: demo1234
-            </p>
-          </div>
         </CardContent>
       </Card>
     </div>
