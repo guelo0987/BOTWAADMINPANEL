@@ -4,12 +4,13 @@ import React from "react"
 
 import { useState } from "react"
 import { useRouter } from "next/navigation"
+import Image from "next/image"
 import { useAuth } from "@/lib/auth-context"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Eye, EyeOff, MessageCircle, Loader2 } from "lucide-react"
+import { Eye, EyeOff, Loader2 } from "lucide-react"
 
 export default function LoginPage() {
   const [whatsappInstanceId, setWhatsappInstanceId] = useState("")
@@ -17,7 +18,7 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState("")
   const [isSubmitting, setIsSubmitting] = useState(false)
-  
+
   const { login } = useAuth()
   const router = useRouter()
 
@@ -46,10 +47,10 @@ export default function LoginPage() {
 
       <Card className="w-full max-w-md relative z-10 border-border/50 shadow-xl">
         <CardHeader className="text-center pb-2">
-          <div className="mx-auto w-16 h-16 bg-primary rounded-2xl flex items-center justify-center mb-4">
-            <MessageCircle className="w-8 h-8 text-primary-foreground" />
+          <div className="mx-auto w-20 h-20 flex items-center justify-center mb-4">
+            <Image src="/dlcbot_logo.png" alt="DlcBot Logo" width={80} height={80} className="object-contain" />
           </div>
-          <CardTitle className="text-2xl font-bold">CompleteAgent</CardTitle>
+          <CardTitle className="text-2xl font-bold">DlcBot</CardTitle>
           <CardDescription className="text-muted-foreground">
             Plataforma de Asistentes Virtuales con IA
           </CardDescription>

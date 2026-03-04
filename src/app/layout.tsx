@@ -7,31 +7,18 @@ import { Toaster } from "@/components/ui/sonner"
 import "./globals.css"
 
 export const metadata: Metadata = {
-  title: "CompleteAgent - Asistentes Virtuales con IA para WhatsApp",
+  title: "DlcBot — Asistentes Virtuales con IA para WhatsApp",
   description:
     "Plataforma SaaS para crear y gestionar asistentes virtuales inteligentes para WhatsApp. Agenda citas, atiende clientes 24/7 y automatiza tu negocio.",
   generator: 'v0.app',
   icons: {
-    icon: [
-      {
-        url: '/icon-light-32x32.png',
-        media: '(prefers-color-scheme: light)',
-      },
-      {
-        url: '/icon-dark-32x32.png',
-        media: '(prefers-color-scheme: dark)',
-      },
-      {
-        url: '/icon.svg',
-        type: 'image/svg+xml',
-      },
-    ],
-    apple: '/apple-icon.png',
+    icon: '/dlcbot_logo.png',
+    apple: '/dlcbot_logo.png',
   },
 }
 
 export const viewport: Viewport = {
-  themeColor: "#667eea",
+  themeColor: "#0f3d8c",
 }
 
 export default function RootLayout({
@@ -40,7 +27,7 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="es">
+    <html lang="es" suppressHydrationWarning>
       <body className="font-sans antialiased">
         <AuthProvider>
           <AdminAuthProvider>

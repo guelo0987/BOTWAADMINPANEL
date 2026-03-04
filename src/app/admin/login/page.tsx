@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Eye, EyeOff, Loader2, Shield } from "lucide-react"
+import Image from "next/image"
 
 export default function AdminLoginPage() {
   const [username, setUsername] = useState("")
@@ -50,8 +51,8 @@ export default function AdminLoginPage() {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="flex flex-col items-center gap-4">
-          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary">
-            <Shield className="h-6 w-6 text-primary-foreground animate-pulse" />
+          <div className="flex h-12 w-12 items-center justify-center rounded-xl overflow-hidden">
+            <Image src="/dlcbot_logo.png" alt="DlcBot" width={48} height={48} className="object-contain animate-pulse" />
           </div>
           <p className="text-sm text-muted-foreground">Cargando...</p>
         </div>
@@ -68,10 +69,10 @@ export default function AdminLoginPage() {
 
       <Card className="w-full max-w-md relative z-10 border-border/50 shadow-xl">
         <CardHeader className="text-center pb-2">
-          <div className="mx-auto w-16 h-16 bg-primary rounded-2xl flex items-center justify-center mb-4">
-            <Shield className="w-8 h-8 text-primary-foreground" />
+          <div className="mx-auto w-20 h-20 flex items-center justify-center mb-4">
+            <Image src="/dlcbot_logo.png" alt="DlcBot Logo" width={80} height={80} className="object-contain" />
           </div>
-          <CardTitle className="text-2xl font-bold">Admin</CardTitle>
+          <CardTitle className="text-2xl font-bold">DlcBot Admin</CardTitle>
           <CardDescription className="text-muted-foreground">
             Acceso para administrar clientes
           </CardDescription>

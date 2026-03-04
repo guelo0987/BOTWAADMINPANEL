@@ -2,8 +2,8 @@
 
 import { useEffect } from "react"
 import { useRouter } from "next/navigation"
+import Image from "next/image"
 import { useAuth } from "@/lib/auth-context"
-import { MessageCircle } from "lucide-react"
 
 export default function HomePage() {
   const { isAuthenticated, isLoading } = useAuth()
@@ -22,11 +22,11 @@ export default function HomePage() {
   return (
     <div className="flex h-screen w-full items-center justify-center bg-background">
       <div className="flex flex-col items-center gap-4">
-        <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-primary">
-          <MessageCircle className="h-8 w-8 text-primary-foreground animate-pulse" />
+        <div className="flex h-16 w-16 items-center justify-center">
+          <Image src="/dlcbot_logo.png" alt="DlcBot Logo" width={64} height={64} className="object-contain animate-pulse" />
         </div>
         <div className="flex flex-col items-center gap-2">
-          <h1 className="text-xl font-semibold">CompleteAgent</h1>
+          <h1 className="text-xl font-semibold">DlcBot</h1>
           <p className="text-sm text-muted-foreground">Cargando...</p>
         </div>
       </div>

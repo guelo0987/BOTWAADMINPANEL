@@ -5,6 +5,7 @@ import React from "react"
 import { useEffect } from "react"
 import { useRouter, usePathname } from "next/navigation"
 import Link from "next/link"
+import Image from "next/image"
 import { useAuth } from "@/lib/auth-context"
 import {
   Sidebar,
@@ -40,7 +41,6 @@ import {
   Settings,
   LogOut,
   ChevronUp,
-  MessageCircle,
   Bot,
   BarChart3,
 } from "lucide-react"
@@ -82,11 +82,11 @@ function DashboardSidebar() {
     <Sidebar>
       <SidebarHeader className="border-b border-sidebar-border">
         <div className="flex items-center gap-3 px-2 py-2">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-sidebar-primary">
-            <MessageCircle className="h-5 w-5 text-sidebar-primary-foreground" />
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl overflow-hidden">
+            <Image src="/dlcbot_logo.png" alt="DlcBot" width={40} height={40} className="object-contain" />
           </div>
           <div className="flex flex-col">
-            <span className="text-sm font-semibold text-sidebar-foreground">CompleteAgent</span>
+            <span className="text-sm font-semibold text-sidebar-foreground">DlcBot</span>
             <span className="text-xs text-sidebar-foreground/60">Panel del Cliente</span>
           </div>
         </div>
@@ -181,9 +181,8 @@ function DashboardHeader() {
         </div>
         <div className="flex items-center gap-2">
           <div
-            className={`h-2 w-2 rounded-full ${
-              user?.is_active ? "bg-green-500" : "bg-destructive"
-            }`}
+            className={`h-2 w-2 rounded-full ${user?.is_active ? "bg-green-500" : "bg-destructive"
+              }`}
           />
           <span className="text-xs text-muted-foreground">
             Bot {user?.is_active ? "Activo" : "Inactivo"}
@@ -198,8 +197,8 @@ function LoadingSkeleton() {
   return (
     <div className="flex h-screen w-full items-center justify-center bg-background">
       <div className="flex flex-col items-center gap-4">
-        <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary">
-          <MessageCircle className="h-6 w-6 text-primary-foreground animate-pulse" />
+        <div className="flex h-12 w-12 items-center justify-center rounded-xl overflow-hidden">
+          <Image src="/dlcbot_logo.png" alt="DlcBot" width={48} height={48} className="object-contain animate-pulse" />
         </div>
         <div className="flex flex-col items-center gap-2">
           <Skeleton className="h-4 w-32" />

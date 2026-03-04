@@ -31,6 +31,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Separator } from "@/components/ui/separator"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Building2, LogOut, ChevronUp, Shield, LayoutDashboard, Users, Calendar, MessageSquare } from "lucide-react"
+import Image from "next/image"
 
 const navigation = [
   {
@@ -60,11 +61,11 @@ function AdminSidebar() {
     <Sidebar>
       <SidebarHeader className="border-b border-sidebar-border">
         <div className="flex items-center gap-3 px-2 py-2">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-sidebar-primary">
-            <Shield className="h-5 w-5 text-sidebar-primary-foreground" />
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl overflow-hidden">
+            <Image src="/dlcbot_logo.png" alt="DlcBot" width={40} height={40} className="object-contain" />
           </div>
           <div className="flex flex-col">
-            <span className="text-sm font-semibold text-sidebar-foreground">CompleteAgent</span>
+            <span className="text-sm font-semibold text-sidebar-foreground">DlcBot</span>
             <span className="text-xs text-sidebar-foreground/60">Panel Admin</span>
           </div>
         </div>
@@ -154,8 +155,8 @@ function LoadingSkeleton() {
   return (
     <div className="flex h-screen w-full items-center justify-center bg-background">
       <div className="flex flex-col items-center gap-4">
-        <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary">
-          <Shield className="h-6 w-6 text-primary-foreground animate-pulse" />
+        <div className="flex h-12 w-12 items-center justify-center rounded-xl overflow-hidden">
+          <Image src="/dlcbot_logo.png" alt="DlcBot" width={48} height={48} className="object-contain animate-pulse" />
         </div>
         <div className="flex flex-col items-center gap-2">
           <Skeleton className="h-4 w-32" />
