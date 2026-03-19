@@ -84,7 +84,7 @@ function CustomerRow({
           </div>
         </div>
       </TableCell>
-      <TableCell>
+      <TableCell className="hidden sm:table-cell">
         {(customer.data as Record<string, unknown>)?.email ? (
           <span className="text-sm">{(customer.data as Record<string, unknown>).email as string}</span>
         ) : (
@@ -94,7 +94,7 @@ function CustomerRow({
       <TableCell>
         <Badge variant="outline">{customerAppointments.length} citas</Badge>
       </TableCell>
-      <TableCell>
+      <TableCell className="hidden md:table-cell">
         {lastAppointment ? (
           <span className="text-sm text-muted-foreground">
             {format(new Date(lastAppointment.start_time), "d MMM yyyy", {
@@ -105,7 +105,7 @@ function CustomerRow({
           <span className="text-sm text-muted-foreground">-</span>
         )}
       </TableCell>
-      <TableCell>
+      <TableCell className="hidden md:table-cell">
         <span className="text-sm text-muted-foreground">
           {format(new Date(customer.created_at), "d MMM yyyy", { locale: es })}
         </span>
@@ -553,48 +553,46 @@ export default function CustomersPage() {
       </div>
 
       {/* Stats */}
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid gap-3 grid-cols-3">
         <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
-                <Users className="h-5 w-5 text-primary" />
+          <CardContent className="p-3 md:p-4">
+            <div className="flex flex-col md:flex-row md:items-center gap-2 md:gap-3">
+              <div className="flex h-8 w-8 md:h-10 md:w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10">
+                <Users className="h-4 w-4 md:h-5 md:w-5 text-primary" />
               </div>
               <div>
-                <p className="text-2xl font-bold">{customers.length}</p>
-                <p className="text-sm text-muted-foreground">Total clientes</p>
+                <p className="text-xl md:text-2xl font-bold">{customers.length}</p>
+                <p className="text-xs md:text-sm text-muted-foreground">Total</p>
               </div>
             </div>
           </CardContent>
         </Card>
         <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-success/10">
-                <Calendar className="h-5 w-5 text-success" />
+          <CardContent className="p-3 md:p-4">
+            <div className="flex flex-col md:flex-row md:items-center gap-2 md:gap-3">
+              <div className="flex h-8 w-8 md:h-10 md:w-10 shrink-0 items-center justify-center rounded-lg bg-success/10">
+                <Calendar className="h-4 w-4 md:h-5 md:w-5 text-success" />
               </div>
               <div>
-                <p className="text-2xl font-bold">
+                <p className="text-xl md:text-2xl font-bold">
                   {appointments.filter((a) => a.status === "CONFIRMED").length}
                 </p>
-                <p className="text-sm text-muted-foreground">Citas activas</p>
+                <p className="text-xs md:text-sm text-muted-foreground">Citas</p>
               </div>
             </div>
           </CardContent>
         </Card>
         <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-accent/10">
-                <MessageSquare className="h-5 w-5 text-accent" />
+          <CardContent className="p-3 md:p-4">
+            <div className="flex flex-col md:flex-row md:items-center gap-2 md:gap-3">
+              <div className="flex h-8 w-8 md:h-10 md:w-10 shrink-0 items-center justify-center rounded-lg bg-accent/10">
+                <MessageSquare className="h-4 w-4 md:h-5 md:w-5 text-accent" />
               </div>
               <div>
-                <p className="text-2xl font-bold">
+                <p className="text-xl md:text-2xl font-bold">
                   {conversations.filter((c) => c.status === "active").length}
                 </p>
-                <p className="text-sm text-muted-foreground">
-                  Conversaciones activas
-                </p>
+                <p className="text-xs md:text-sm text-muted-foreground">Activas</p>
               </div>
             </div>
           </CardContent>
@@ -614,6 +612,7 @@ export default function CustomersPage() {
         </div>
         <Button
           variant="outline"
+          title="Exportar CSV"
           onClick={() => {
             const header = "ID,Nombre,Teléfono,Email,Fecha Registro\n"
             const rows = filteredCustomers.map((c) => {
@@ -629,8 +628,8 @@ export default function CustomersPage() {
             URL.revokeObjectURL(url)
           }}
         >
-          <FileText className="h-4 w-4 mr-2" />
-          Exportar CSV
+          <FileText className="h-4 w-4 sm:mr-2" />
+          <span className="hidden sm:inline">Exportar CSV</span>
         </Button>
       </div>
 
@@ -655,14 +654,15 @@ export default function CustomersPage() {
               </p>
             </div>
           ) : (
-            <Table>
+            <div className="overflow-x-auto">
+          <Table>
               <TableHeader>
                 <TableRow>
                   <TableHead>Cliente</TableHead>
-                  <TableHead>Email</TableHead>
+                  <TableHead className="hidden sm:table-cell">Email</TableHead>
                   <TableHead>Citas</TableHead>
-                  <TableHead>Última cita</TableHead>
-                  <TableHead>Cliente desde</TableHead>
+                  <TableHead className="hidden md:table-cell">Última cita</TableHead>
+                  <TableHead className="hidden md:table-cell">Cliente desde</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -676,6 +676,7 @@ export default function CustomersPage() {
                 ))}
               </TableBody>
             </Table>
+          </div>
           )}
         </CardContent>
       </Card>

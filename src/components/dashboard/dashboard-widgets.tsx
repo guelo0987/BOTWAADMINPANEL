@@ -69,14 +69,14 @@ export function MetricCard({
     
     return (
         <Card>
-            <CardContent className="p-6">
+            <CardContent className="p-4 sm:p-6">
                 <div className="flex items-center justify-between">
-                    <div className="space-y-1">
-                        <p className="text-sm text-muted-foreground">{title}</p>
-                        <p className="text-3xl font-bold">{value}</p>
+                    <div className="space-y-0.5">
+                        <p className="text-xs sm:text-sm text-muted-foreground">{title}</p>
+                        <p className="text-2xl sm:text-3xl font-bold">{value}</p>
                         {change !== undefined && (
                             <p
-                                className={`text-sm flex items-center gap-1 ${trend === "up"
+                                className={`text-xs sm:text-sm flex items-center gap-1 ${trend === "up"
                                         ? "text-green-600"
                                         : trend === "down"
                                             ? "text-destructive"
@@ -88,8 +88,8 @@ export function MetricCard({
                             </p>
                         )}
                     </div>
-                    <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10">
-                        <Icon className="h-6 w-6 text-primary" />
+                    <div className="flex h-10 w-10 sm:h-12 sm:w-12 shrink-0 items-center justify-center rounded-xl bg-primary/10">
+                        <Icon className="h-5 w-5 sm:h-6 sm:w-6 text-primary" />
                     </div>
                 </div>
             </CardContent>
@@ -287,9 +287,9 @@ export function RecentConversations({ conversations }: { conversations: Conversa
                         <a
                             key={conversation.customer_id ?? conversation.id ?? Math.random()}
                             href={`/dashboard/conversations?open=${conversation.customer_id}`}
-                            className="flex items-center gap-4 p-3 rounded-lg border border-border hover:bg-muted/50 transition-colors"
+                            className="flex items-center gap-3 p-3 rounded-lg border border-border hover:bg-muted/50 transition-colors"
                         >
-                            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-primary font-semibold text-sm">
+                            <div className="flex h-9 w-9 sm:h-10 sm:w-10 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary font-semibold text-xs sm:text-sm">
                                 {conversation.customer_name
                                     ? conversation.customer_name
                                         .split(" ")
@@ -299,7 +299,7 @@ export function RecentConversations({ conversations }: { conversations: Conversa
                                     : "?"}
                             </div>
                             <div className="flex-1 min-w-0">
-                                <div className="flex items-center gap-2">
+                                <div className="flex items-center gap-2 flex-wrap">
                                     <p className="font-medium text-sm truncate">
                                         {conversation.customer_name || conversation.phone_number}
                                     </p>
@@ -310,11 +310,19 @@ export function RecentConversations({ conversations }: { conversations: Conversa
                                         {statusLabels[conversation.status]}
                                     </Badge>
                                 </div>
-                                <p className="text-sm text-muted-foreground truncate">
+                                <p className="text-xs text-muted-foreground truncate mt-0.5">
                                     {conversation.last_message}
                                 </p>
+                                <p className="text-xs text-muted-foreground sm:hidden mt-0.5">
+                                    {conversation.last_message_at
+                                        ? formatDistanceToNow(new Date(conversation.last_message_at), {
+                                            addSuffix: true,
+                                            locale: es,
+                                        })
+                                        : "Sin mensajes"}
+                                </p>
                             </div>
-                            <div className="text-xs text-muted-foreground whitespace-nowrap">
+                            <div className="hidden sm:block text-xs text-muted-foreground whitespace-nowrap">
                                 {conversation.last_message_at ? (
                                     formatDistanceToNow(new Date(conversation.last_message_at), {
                                         addSuffix: true,
@@ -368,8 +376,8 @@ export function UpcomingAppointments({ appointments }: { appointments: Appointme
                             key={appointment.id}
                             className="flex items-center gap-3 p-3 rounded-lg border border-border"
                         >
-                            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
-                                <Clock className="h-5 w-5 text-primary" />
+                            <div className="flex h-9 w-9 sm:h-10 sm:w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10">
+                                <Clock className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />
                             </div>
                             <div className="flex-1 min-w-0">
                                 <p className="font-medium text-sm truncate">
@@ -387,7 +395,7 @@ export function UpcomingAppointments({ appointments }: { appointments: Appointme
                             </div>
                             <Badge
                                 variant="outline"
-                                className={`text-xs ${statusColors[appointment.status]}`}
+                                className={`text-xs shrink-0 ${statusColors[appointment.status]}`}
                             >
                                 {statusLabels[appointment.status]}
                             </Badge>

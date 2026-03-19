@@ -57,30 +57,30 @@ export default async function DashboardPage() {
         <div className="flex flex-wrap gap-2">
           <Button asChild variant="outline" size="sm">
             <Link href="/dashboard/conversations">
-              <MessageSquare className="h-4 w-4 mr-2" />
-              Conversaciones
-              <ArrowRight className="h-4 w-4 ml-2" />
+              <MessageSquare className="h-4 w-4 sm:mr-2" />
+              <span className="hidden sm:inline">Conversaciones</span>
+              <ArrowRight className="h-4 w-4 sm:ml-2" />
             </Link>
           </Button>
           <Button asChild variant="outline" size="sm">
             <Link href="/dashboard/appointments">
-              <Calendar className="h-4 w-4 mr-2" />
-              Citas
-              <ArrowRight className="h-4 w-4 ml-2" />
+              <Calendar className="h-4 w-4 sm:mr-2" />
+              <span className="hidden sm:inline">Citas</span>
+              <ArrowRight className="h-4 w-4 sm:ml-2" />
             </Link>
           </Button>
           <Button asChild variant="outline" size="sm">
             <Link href="/dashboard/bot-config">
-              <Bot className="h-4 w-4 mr-2" />
-              Configurar Bot
-              <ArrowRight className="h-4 w-4 ml-2" />
+              <Bot className="h-4 w-4 sm:mr-2" />
+              <span className="hidden sm:inline">Configurar Bot</span>
+              <ArrowRight className="h-4 w-4 sm:ml-2" />
             </Link>
           </Button>
         </div>
       </div>
 
       {/* Metrics Grid */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-3 grid-cols-2 lg:grid-cols-4">
         <MetricCard
           title="Conversaciones Hoy"
           value={stats.conversations_today}

@@ -1,20 +1,13 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect, useRef, useCallback } from "react"
 import { useSearchParams } from "next/navigation"
 import { useAuth } from "@/lib/auth-context"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { ScrollArea } from "@/components/ui/scroll-area"
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-} from "@/components/ui/sheet"
+import { Textarea } from "@/components/ui/textarea"
+import { Skeleton } from "@/components/ui/skeleton"
 import {
   Select,
   SelectContent,
@@ -28,37 +21,88 @@ import {
   MessageSquare,
   AlertTriangle,
   CheckCircle,
-  Clock,
   Send,
   Bot,
   User,
+  Loader2,
+  ChevronRight,
+  UserCheck,
+  ArrowLeft,
 } from "lucide-react"
 import type { Conversation, Message } from "@/types"
 import { useToast } from "@/hooks/use-toast"
-import { formatDistanceToNow, format } from "date-fns"
+import { useIsMobile } from "@/hooks/use-mobile"
+import { formatDistanceToNow, format, isToday, isYesterday, isSameDay } from "date-fns"
 import { es } from "date-fns/locale"
 
-const statusConfig = {
+// ─── Config ─────────────────────────────────────────────────────────────────
+
+const STATUS_CONFIG = {
   active: {
     label: "IA respondiendo",
+    shortLabel: "IA",
     color: "bg-green-500/10 text-green-600 border-green-500/20",
+    dot: "bg-green-500",
     icon: Bot,
   },
   resolved: {
     label: "Resuelta",
+    shortLabel: "Resuelta",
     color: "bg-muted text-muted-foreground border-border",
+    dot: "bg-muted-foreground/50",
     icon: CheckCircle,
   },
   escalated: {
     label: "Escalada",
+    shortLabel: "Escalada",
     color: "bg-destructive/10 text-destructive border-destructive/20",
+    dot: "bg-destructive",
     icon: AlertTriangle,
   },
   human_handled: {
     label: "Tú respondiendo",
+    shortLabel: "Tú",
     color: "bg-blue-500/10 text-blue-600 border-blue-500/20",
-    icon: User,
+    dot: "bg-blue-500",
+    icon: UserCheck,
   },
+} as const
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+function getInitials(name: string) {
+  return name
+    .split(" ")
+    .map((n) => n[0])
+    .join("")
+    .toUpperCase()
+    .slice(0, 2)
+}
+
+function formatDateSeparator(date: Date) {
+  if (isToday(date)) return "Hoy"
+  if (isYesterday(date)) return "Ayer"
+  return format(date, "d 'de' MMMM, yyyy", { locale: es })
+}
+
+function getStatusConfig(status: string) {
+  return STATUS_CONFIG[status as keyof typeof STATUS_CONFIG] ?? STATUS_CONFIG.active
+}
+
+// ─── Sub-components ──────────────────────────────────────────────────────────
+
+function AvatarBubble({ name, status }: { name: string; status: string }) {
+  const cfg = getStatusConfig(status)
+  return (
+    <div className="relative shrink-0">
+      <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-primary font-semibold text-sm select-none">
+        {name ? getInitials(name) : "?"}
+      </div>
+      <span
+        className={`absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full border-2 border-background ${cfg.dot}`}
+      />
+    </div>
+  )
 }
 
 function ConversationItem({
@@ -70,52 +114,50 @@ function ConversationItem({
   isSelected: boolean
   onClick: () => void
 }) {
-  const config = statusConfig[conversation.status]
-  const StatusIcon = config.icon
+  const cfg = getStatusConfig(conversation.status)
+  const relTime =
+    conversation.last_message_at || conversation.last_message_time
+      ? formatDistanceToNow(
+          new Date(
+            conversation.last_message_at || conversation.last_message_time || new Date()
+          ),
+          { addSuffix: false, locale: es }
+        )
+      : ""
 
   return (
     <button
       onClick={onClick}
-      className={`w-full p-4 text-left border-b border-border transition-colors hover:bg-muted/50 ${isSelected ? "bg-primary/5 border-l-2 border-l-primary" : ""
-        }`}
+      className={`w-full px-4 py-3.5 md:py-3 text-left transition-colors active:bg-muted/80 hover:bg-muted/60 ${
+        isSelected
+          ? "bg-primary/5 border-r-[3px] border-r-primary"
+          : "border-r-[3px] border-r-transparent"
+      }`}
     >
-      <div className="flex items-start gap-3">
-        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary font-semibold text-sm">
-          {conversation.customer_name
-            ? conversation.customer_name
-              .split(" ")
-              .map((n) => n[0])
-              .join("")
-              .slice(0, 2)
-            : "?"}
-        </div>
+      <div className="flex items-center gap-3">
+        <AvatarBubble
+          name={conversation.customer_name || conversation.phone_number}
+          status={conversation.status}
+        />
         <div className="flex-1 min-w-0">
           <div className="flex items-center justify-between gap-2">
-            <p className="font-medium text-sm truncate">
+            <p className={`text-sm truncate ${isSelected ? "font-semibold" : "font-medium"}`}>
               {conversation.customer_name || conversation.phone_number}
             </p>
-            <span className="text-xs text-muted-foreground whitespace-nowrap">
-              {conversation.last_message_at || conversation.last_message_time ? (
-                formatDistanceToNow(new Date(conversation.last_message_at || conversation.last_message_time || new Date()), {
-                  addSuffix: false,
-                  locale: es,
-                })
-              ) : (
-                "Sin mensajes"
-              )}
+            <span className="text-[10px] text-muted-foreground whitespace-nowrap shrink-0">
+              {relTime}
             </span>
           </div>
-          <p className="text-sm text-muted-foreground truncate mt-0.5">
-            {conversation.last_message}
-          </p>
-          <div className="flex items-center gap-2 mt-2">
-            <Badge variant="outline" className={`text-xs ${config.color}`}>
-              <StatusIcon className="h-3 w-3 mr-1" />
-              {config.label}
+          <div className="flex items-center justify-between gap-2 mt-0.5">
+            <p className="text-xs text-muted-foreground truncate leading-snug flex-1">
+              {conversation.last_message || "Sin mensajes"}
+            </p>
+            <Badge
+              variant="outline"
+              className={`text-[10px] px-1.5 py-0 h-4 shrink-0 md:hidden ${cfg.color}`}
+            >
+              {cfg.shortLabel}
             </Badge>
-            <span className="text-xs text-muted-foreground">
-              {conversation.message_count} mensajes
-            </span>
           </div>
         </div>
       </div>
@@ -123,667 +165,816 @@ function ConversationItem({
   )
 }
 
-function MessageBubble({ message }: { message: Message }) {
-  const isBot = message.sender === "bot"
+function DateSeparator({ date }: { date: Date }) {
+  return (
+    <div className="flex items-center gap-3 my-3">
+      <div className="h-px flex-1 bg-border" />
+      <span className="text-[10px] font-medium text-muted-foreground px-2 uppercase tracking-wide">
+        {formatDateSeparator(date)}
+      </span>
+      <div className="h-px flex-1 bg-border" />
+    </div>
+  )
+}
+
+function MessageBubble({
+  message,
+  showTime,
+}: {
+  message: Message
+  showTime: boolean
+}) {
   const isCustomer = message.sender === "customer"
   const isAgent = message.sender === "agent"
+  const isBot = message.sender === "bot"
 
   return (
-    <div
-      className={`flex gap-2 ${isCustomer ? "flex-row-reverse" : "flex-row"}`}
-    >
+    <div className={`flex gap-2 ${isCustomer ? "flex-row-reverse" : "flex-row"}`}>
       <div
-        className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${isBot
-          ? "bg-primary/10 text-primary"
-          : isAgent
+        className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs hidden md:flex ${
+          isBot
+            ? "bg-primary/10 text-primary"
+            : isAgent
             ? "bg-blue-500/10 text-blue-600"
-            : isCustomer
-              ? "bg-muted text-muted-foreground"
-              : "bg-warning/10 text-warning-foreground"
-          }`}
+            : "bg-muted text-muted-foreground"
+        }`}
       >
-        {isBot ? (
-          <Bot className="h-4 w-4" />
-        ) : isAgent ? (
-          <User className="h-4 w-4" />
-        ) : (
-          <User className="h-4 w-4" />
-        )}
+        {isBot ? <Bot className="h-3.5 w-3.5" /> : <User className="h-3.5 w-3.5" />}
       </div>
+
       <div
-        className={`max-w-[70%] rounded-2xl px-4 py-2 ${isCustomer
-          ? "bg-primary text-primary-foreground rounded-tr-none"
-          : isAgent
-            ? "bg-blue-500/10 text-blue-600 border border-blue-500/20 rounded-tl-none"
-            : "bg-muted rounded-tl-none"
-          }`}
+        className={`max-w-[85%] md:max-w-[72%] flex flex-col gap-0.5 ${
+          isCustomer ? "items-end" : "items-start"
+        }`}
       >
         {isAgent && (
-          <p className="text-xs font-medium mb-1 opacity-70">Agente</p>
+          <p className="text-[10px] font-semibold text-blue-600 px-1">Agente</p>
         )}
-        <p className={`text-sm ${isCustomer ? "text-primary-foreground" : ""}`}>{message.content}</p>
-        <p
-          className={`text-xs mt-1 ${isCustomer ? "text-primary-foreground/70" : "text-muted-foreground"
-            }`}
+        <div
+          className={`rounded-2xl px-3.5 py-2 text-sm leading-relaxed ${
+            isCustomer
+              ? "bg-primary text-primary-foreground rounded-tr-none"
+              : isAgent
+              ? "bg-blue-50 text-blue-900 border border-blue-100 rounded-tl-none dark:bg-blue-950 dark:text-blue-100 dark:border-blue-900"
+              : "bg-muted rounded-tl-none"
+          }`}
         >
-          {message.timestamp ? format(new Date(message.timestamp), "HH:mm") : ""}
-        </p>
+          <p className="whitespace-pre-wrap break-words">{message.content}</p>
+        </div>
+        {showTime && message.timestamp && (
+          <p
+            className={`text-[10px] text-muted-foreground px-1 ${
+              isCustomer ? "text-right" : "text-left"
+            }`}
+          >
+            {format(new Date(message.timestamp), "HH:mm")}
+          </p>
+        )}
       </div>
     </div>
   )
 }
 
-function ConversationDetail({
+// ─── Chat panel ───────────────────────────────────────────────────────────────
+
+function ChatPanel({
   conversation,
-  open,
-  onClose,
   clientId,
   businessName,
   onRefresh,
+  onBack,
 }: {
-  conversation: Conversation | null
-  open: boolean
-  onClose: () => void
+  conversation: Conversation
   clientId?: number
   businessName?: string
-  onRefresh?: () => void
+  onRefresh: () => void
+  onBack?: () => void
 }) {
   const [newMessage, setNewMessage] = useState("")
   const [messages, setMessages] = useState<Message[]>([])
   const [isLoadingMessages, setIsLoadingMessages] = useState(false)
   const [isSending, setIsSending] = useState(false)
-  const [conversationStatus, setConversationStatus] = useState(conversation?.status || "active")
+  const [conversationStatus, setConversationStatus] = useState(conversation.status)
+  const [showEscalateInput, setShowEscalateInput] = useState(false)
+  const [escalateReason, setEscalateReason] = useState("")
+  const [showResolveOptions, setShowResolveOptions] = useState(false)
+
+  const isMobile = useIsMobile()
   const { toast } = useToast()
+  const bottomRef = useRef<HTMLDivElement>(null)
+  const inputRef = useRef<HTMLTextAreaElement>(null)
+  const messagesLengthRef = useRef(0)
 
-  // Cargar mensajes cuando se abre el detalle
-  useEffect(() => {
-    if (open && conversation && clientId) {
-      loadMessages()
+  const scrollToBottom = useCallback((behavior: ScrollBehavior = "smooth") => {
+    bottomRef.current?.scrollIntoView({ behavior })
+  }, [])
 
-      const interval = setInterval(() => {
-        loadMessages(true)
-      }, 5000)
+  const loadMessages = useCallback(
+    async (silent = false) => {
+      if (!conversation?.customer_id || !clientId) return
+      try {
+        if (!silent) setIsLoadingMessages(true)
+        const res = await fetch(
+          `/api/admin/conversations/${conversation.customer_id}/history?client_id=${clientId}`
+        )
+        if (!res.ok) throw new Error("Error cargando mensajes")
+        const data = await res.json()
 
-      return () => clearInterval(interval)
-    }
-  }, [open, conversation?.customer_id, clientId])
-
-  const loadMessages = async (silent = false) => {
-    if (!conversation?.customer_id || !clientId) return
-
-    try {
-      if (!silent) setIsLoadingMessages(true)
-      const response = await fetch(
-        `/api/admin/conversations/${conversation.customer_id}/history?client_id=${clientId}`
-      )
-      if (!response.ok) throw new Error("Failed to load messages")
-
-      const data = await response.json()
-
-      // Convertir mensajes del formato Redis al formato Message
-      const formattedMessages: Message[] = data.messages.map((msg: any, index: number) => {
-        // Determinar el sender basado en role y human flag
-        let sender: "customer" | "bot" | "agent" = "bot"
-        if (msg.role === "user") {
-          sender = "customer"
-        } else if (msg.human) {
-          sender = "agent"
-        } else {
-          sender = "bot"
-        }
-
-        return {
-          id: index + 1,
+        const formatted: Message[] = data.messages.map((msg: any, i: number) => ({
+          id: i + 1,
           conversation_id: conversation.customer_id,
           content: msg.content,
-          sender,
+          sender:
+            msg.role === "user" ? "customer" : msg.human ? "agent" : ("bot" as const),
           timestamp: msg.timestamp || new Date().toISOString(),
-        }
-      })
+        }))
 
-      setMessages(formattedMessages)
-      setConversationStatus(data.status.status)
-    } catch (error) {
-      console.error("Error loading messages:", error)
-      toast({
-        title: "Error",
-        description: "No se pudieron cargar los mensajes",
-        variant: "destructive",
-      })
-    } finally {
-      if (!silent) setIsLoadingMessages(false)
-    }
-  }
+        setMessages(formatted)
+        setConversationStatus(data.status.status)
+      } catch {
+        if (!silent)
+          toast({
+            title: "Error",
+            description: "No se pudieron cargar los mensajes",
+            variant: "destructive",
+          })
+      } finally {
+        if (!silent) setIsLoadingMessages(false)
+      }
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [conversation.customer_id, clientId]
+  )
+
+  // Reset & load when conversation changes
+  useEffect(() => {
+    setMessages([])
+    setNewMessage("")
+    setConversationStatus(conversation.status)
+    setShowEscalateInput(false)
+    setShowResolveOptions(false)
+    messagesLengthRef.current = 0
+    loadMessages(false)
+  }, [conversation.customer_id]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Scroll to bottom when messages arrive
+  useEffect(() => {
+    if (messages.length === 0) return
+    const isFirstLoad = messagesLengthRef.current === 0
+    scrollToBottom(isFirstLoad ? "instant" : "smooth")
+    messagesLengthRef.current = messages.length
+  }, [messages.length, scrollToBottom])
+
+  // Auto-refresh messages every 5s
+  useEffect(() => {
+    const iv = setInterval(() => loadMessages(true), 5000)
+    return () => clearInterval(iv)
+  }, [loadMessages])
+
+  // ── Actions ────────────────────────────────────────────────────────────────
 
   const handleSendMessage = async () => {
-    if (!newMessage.trim() || !conversation?.customer_id || !clientId) return
+    const text = newMessage.trim()
+    if (!text || !conversation?.customer_id || !clientId || isSending) return
+
+    setNewMessage("")
+    if (inputRef.current) inputRef.current.style.height = "40px"
+
+    const optimistic: Message = {
+      id: messages.length + 1,
+      conversation_id: conversation.customer_id,
+      content: text,
+      sender: "agent",
+      timestamp: new Date().toISOString(),
+    }
+    setMessages((prev) => [...prev, optimistic])
+    scrollToBottom()
 
     try {
       setIsSending(true)
-      const response = await fetch(
+      const res = await fetch(
         `/api/admin/conversations/${conversation.customer_id}/send-message`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             client_id: clientId,
-            message: newMessage,
+            message: text,
             admin_name: businessName,
           }),
         }
       )
-
-      if (!response.ok) {
-        const error = await response.json()
-        throw new Error(error.error || "Failed to send message")
-      }
-
-      setNewMessage("")
+      if (!res.ok) throw new Error((await res.json()).error || "Error")
       setConversationStatus("human_handled")
-      await loadMessages() // Recargar mensajes
-      onRefresh?.() // Refrescar lista de conversaciones
-
-      toast({
-        title: "Mensaje enviado",
-        description: "El mensaje se envió correctamente",
-      })
+      onRefresh()
+      await loadMessages(true)
     } catch (error: any) {
-      console.error("Error sending message:", error)
-      toast({
-        title: "Error",
-        description: error.message || "No se pudo enviar el mensaje",
-        variant: "destructive",
-      })
+      setMessages((prev) => prev.filter((m) => m !== optimistic))
+      setNewMessage(text)
+      toast({ title: "Error al enviar", description: error.message, variant: "destructive" })
     } finally {
       setIsSending(false)
+      inputRef.current?.focus()
+    }
+  }
+
+  const handleTakeConversation = async () => {
+    if (!conversation?.customer_id || !clientId) return
+    try {
+      const res = await fetch(
+        `/api/admin/conversations/${conversation.customer_id}/take`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ client_id: clientId, admin_name: businessName }),
+        }
+      )
+      if (!res.ok) throw new Error((await res.json()).error)
+      setConversationStatus("human_handled")
+      onRefresh()
+      toast({ title: "Control tomado", description: "La IA está pausada. Escribe tu mensaje." })
+      inputRef.current?.focus()
+    } catch (error: any) {
+      toast({ title: "Error", description: error.message, variant: "destructive" })
     }
   }
 
   const handleEscalate = async () => {
     if (!conversation?.customer_id || !clientId) return
-
-    const motivo = prompt("Motivo de escalación (opcional):")
-    if (motivo === null) return // Usuario canceló
-
     try {
-      const response = await fetch(
+      const res = await fetch(
         `/api/admin/conversations/${conversation.customer_id}/escalate`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             client_id: clientId,
-            motivo: motivo || "Escalado manualmente desde panel",
+            motivo: escalateReason.trim() || "Escalado manualmente desde panel",
           }),
         }
       )
-
-      if (!response.ok) {
-        const error = await response.json()
-        throw new Error(error.error || "Failed to escalate")
-      }
-
+      if (!res.ok) throw new Error((await res.json()).error)
       setConversationStatus("escalated")
-      onRefresh?.()
-
-      toast({
-        title: "Conversación escalada",
-        description: "La conversación ha sido marcada como escalada",
-      })
+      setShowEscalateInput(false)
+      setEscalateReason("")
+      onRefresh()
+      toast({ title: "Conversación escalada" })
     } catch (error: any) {
-      console.error("Error escalating:", error)
-      toast({
-        title: "Error",
-        description: error.message || "No se pudo escalar la conversación",
-        variant: "destructive",
-      })
+      toast({ title: "Error", description: error.message, variant: "destructive" })
     }
   }
 
-  const handleTakeConversation = async () => {
+  const handleResolve = async (resumeAI: boolean) => {
     if (!conversation?.customer_id || !clientId) return
-
     try {
-      const response = await fetch(
-        `/api/admin/conversations/${conversation.customer_id}/take`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            client_id: clientId,
-            admin_name: businessName,
-          }),
-        }
-      )
-
-      if (!response.ok) {
-        const error = await response.json()
-        throw new Error(error.error || "Failed to take conversation")
-      }
-
-      setConversationStatus("human_handled")
-      onRefresh?.()
-
-      toast({
-        title: "Conversación tomada",
-        description: "La IA está pausada. Escribe y envía tu mensaje.",
-      })
-    } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error.message || "No se pudo tomar la conversación",
-        variant: "destructive",
-      })
-    }
-  }
-
-  const handleResolve = async () => {
-    if (!conversation?.customer_id || !clientId) return
-
-    const resumeAI = confirm(
-      "¿Reanudar la IA para que responda automáticamente? (Cancelar = solo marcar como resuelta)"
-    )
-
-    try {
-      const response = await fetch(
+      const res = await fetch(
         `/api/admin/conversations/${conversation.customer_id}/resolve`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            client_id: clientId,
-            resume_ai: resumeAI,
-          }),
+          body: JSON.stringify({ client_id: clientId, resume_ai: resumeAI }),
         }
       )
-
-      if (!response.ok) {
-        const error = await response.json()
-        throw new Error(error.error || "Failed to resolve")
-      }
-
+      if (!res.ok) throw new Error((await res.json()).error)
       setConversationStatus(resumeAI ? "active" : "resolved")
-      onRefresh?.()
-
+      setShowResolveOptions(false)
+      onRefresh()
       toast({
-        title: "Conversación resuelta",
-        description: resumeAI ? "La IA ha sido reanudada" : "La conversación ha sido marcada como resuelta",
+        title: "Resuelta",
+        description: resumeAI
+          ? "La IA ha reanudado la conversación"
+          : "Marcada como resuelta",
       })
     } catch (error: any) {
-      console.error("Error resolving:", error)
-      toast({
-        title: "Error",
-        description: error.message || "No se pudo resolver la conversación",
-        variant: "destructive",
-      })
+      toast({ title: "Error", description: error.message, variant: "destructive" })
     }
   }
 
-  if (!conversation) return null
+  // ── Render helpers ─────────────────────────────────────────────────────────
 
-  const config = statusConfig[conversationStatus as keyof typeof statusConfig] || statusConfig.active
+  const cfg = getStatusConfig(conversationStatus)
+  const StatusIcon = cfg.icon
+
+  const renderedMessages = () => {
+    const nodes: React.ReactNode[] = []
+    let lastDate: Date | null = null
+
+    messages.forEach((msg, i) => {
+      const msgDate = msg.timestamp ? new Date(msg.timestamp) : null
+      const nextMsg = messages[i + 1]
+      const nextDate = nextMsg?.timestamp ? new Date(nextMsg.timestamp) : null
+
+      if (msgDate && (!lastDate || !isSameDay(lastDate, msgDate))) {
+        nodes.push(<DateSeparator key={`sep-${i}`} date={msgDate} />)
+        lastDate = msgDate
+      }
+
+      const showTime =
+        i === messages.length - 1 ||
+        nextMsg?.sender !== msg.sender ||
+        (nextDate && msgDate && !isSameDay(msgDate, nextDate))
+
+      nodes.push(
+        <MessageBubble key={msg.id} message={msg} showTime={!!showTime} />
+      )
+    })
+    return nodes
+  }
+
+  // ── JSX ────────────────────────────────────────────────────────────────────
 
   return (
-    <Sheet open={open} onOpenChange={onClose}>
-      <SheetContent className="w-full sm:max-w-lg p-0 flex flex-col h-full">
-        <SheetHeader className="p-4 border-b border-border">
-          <div className="flex items-center gap-3">
-            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 text-primary font-semibold">
-              {conversation.customer_name
-                ? conversation.customer_name
-                  .split(" ")
-                  .map((n) => n[0])
-                  .join("")
-                  .slice(0, 2)
-                : "?"}
-            </div>
-            <div className="flex-1">
-              <SheetTitle className="text-left">
-                {conversation.customer_name || "Cliente"}
-              </SheetTitle>
-              <SheetDescription className="text-left flex items-center gap-2">
-                <Phone className="h-3 w-3" />
-                +{conversation.phone_number}
-              </SheetDescription>
-            </div>
-            <Badge variant="outline" className={config.color}>
-              {config.label}
-            </Badge>
+    <div className="flex flex-col h-full">
+      {/* Header */}
+      <div className="flex items-center gap-2 md:gap-3 px-3 md:px-4 py-3 border-b bg-background shrink-0">
+        {onBack && (
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={onBack}
+            className="shrink-0 h-9 w-9 -ml-1"
+          >
+            <ArrowLeft className="h-5 w-5" />
+          </Button>
+        )}
+        <AvatarBubble
+          name={conversation.customer_name || conversation.phone_number}
+          status={conversationStatus}
+        />
+        <div className="flex-1 min-w-0">
+          <p className="font-semibold text-sm truncate">
+            {conversation.customer_name || "Cliente"}
+          </p>
+          <p className="text-xs text-muted-foreground flex items-center gap-1">
+            <Phone className="h-3 w-3" />+{conversation.phone_number}
+          </p>
+        </div>
+        <Badge variant="outline" className={`text-xs shrink-0 ${cfg.color}`}>
+          <StatusIcon className="h-3 w-3 mr-1" />
+          <span className="hidden sm:inline">{cfg.label}</span>
+          <span className="sm:hidden">{cfg.shortLabel}</span>
+        </Badge>
+      </div>
+
+      {/* Messages area */}
+      <div className="flex-1 overflow-y-auto px-3 md:px-4 py-3 space-y-1.5 scroll-smooth">
+        {isLoadingMessages ? (
+          <div className="space-y-4 pt-4">
+            {[1, 2, 3, 4, 5].map((i) => (
+              <div
+                key={i}
+                className={`flex gap-2 ${i % 2 === 0 ? "flex-row-reverse" : "flex-row"}`}
+              >
+                <Skeleton className="h-7 w-7 rounded-full shrink-0 hidden md:block" />
+                <Skeleton className={`h-12 rounded-2xl ${i % 2 === 0 ? "w-48" : "w-40"}`} />
+              </div>
+            ))}
           </div>
-        </SheetHeader>
+        ) : messages.length === 0 ? (
+          <div className="flex flex-col items-center justify-center h-full gap-2 text-muted-foreground">
+            <MessageSquare className="h-10 w-10 opacity-20" />
+            <p className="text-sm">Sin mensajes aún</p>
+          </div>
+        ) : (
+          renderedMessages()
+        )}
+        <div ref={bottomRef} />
+      </div>
 
-        <ScrollArea className="flex-1 p-4 min-h-0">
-          {isLoadingMessages ? (
-            <div className="flex items-center justify-center py-12">
-              <Clock className="h-6 w-6 animate-spin text-muted-foreground" />
-            </div>
-          ) : messages.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-12 text-center">
-              <MessageSquare className="h-12 w-12 text-muted-foreground/50 mb-4" />
-              <p className="text-sm text-muted-foreground">No hay mensajes en esta conversación</p>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              {messages.map((message) => (
-                <MessageBubble key={message.id} message={message} />
-              ))}
-            </div>
-          )}
-        </ScrollArea>
+      {/* Footer */}
+      <div
+        className="border-t bg-background px-3 md:px-4 pt-3 space-y-2.5 md:space-y-3 shrink-0"
+        style={{ paddingBottom: "max(1rem, env(safe-area-inset-bottom))" }}
+      >
+        {/* Status context info */}
+        {(conversation.is_human_handled && conversation.admin) ||
+        (conversation.is_escalated && conversation.escalation_reason) ? (
+          <div className="flex items-center gap-1.5 text-xs text-muted-foreground bg-muted/50 rounded-lg px-3 py-2">
+            {conversation.is_human_handled && conversation.admin && (
+              <span>
+                Manejada por <strong className="text-foreground">{conversation.admin}</strong>
+              </span>
+            )}
+            {conversation.is_escalated && conversation.escalation_reason && (
+              <span>
+                Motivo: <strong className="text-foreground">{conversation.escalation_reason}</strong>
+              </span>
+            )}
+          </div>
+        ) : null}
 
-        <div className="p-4 border-t border-border bg-background">
-          {/* Información de estado */}
-          {(conversation.is_human_handled || conversation.is_escalated) && (
-            <div className="mb-3 p-3 rounded-lg bg-muted/50 border border-border">
-              {conversation.is_human_handled && conversation.admin && (
-                <p className="text-xs text-muted-foreground">
-                  Manejada por: <span className="font-medium">{conversation.admin}</span>
-                </p>
-              )}
-              {conversation.is_escalated && conversation.escalation_reason && (
-                <p className="text-xs text-muted-foreground mt-1">
-                  Motivo: <span className="font-medium">{conversation.escalation_reason}</span>
-                </p>
-              )}
+        {/* Inline escalate form */}
+        {showEscalateInput && (
+          <div className="flex flex-col sm:flex-row gap-2">
+            <Input
+              placeholder="Motivo de escalación (opcional)"
+              value={escalateReason}
+              onChange={(e) => setEscalateReason(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") handleEscalate()
+                if (e.key === "Escape") {
+                  setShowEscalateInput(false)
+                  setEscalateReason("")
+                }
+              }}
+              className="flex-1 h-9 md:h-8 text-sm"
+              autoFocus
+            />
+            <div className="flex gap-2">
+              <Button size="sm" variant="destructive" onClick={handleEscalate} className="flex-1 sm:flex-none h-9 md:h-8">
+                Confirmar
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="flex-1 sm:flex-none h-9 md:h-8"
+                onClick={() => {
+                  setShowEscalateInput(false)
+                  setEscalateReason("")
+                }}
+              >
+                Cancelar
+              </Button>
             </div>
-          )}
+          </div>
+        )}
 
-          <div className="flex flex-wrap items-center gap-2 mb-3">
+        {/* Inline resolve options */}
+        {showResolveOptions && (
+          <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+            <span className="text-xs text-muted-foreground">¿Qué hacer?</span>
+            <div className="flex gap-2 flex-1">
+              <Button size="sm" variant="outline" onClick={() => handleResolve(false)} className="flex-1 sm:flex-none h-9 md:h-8">
+                Solo resolver
+              </Button>
+              <Button size="sm" onClick={() => handleResolve(true)} className="flex-1 sm:flex-none h-9 md:h-8">
+                Reanudar IA
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => setShowResolveOptions(false)}
+                className="h-9 md:h-8 px-2"
+              >
+                Cancelar
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {/* Action buttons */}
+        {!showEscalateInput && !showResolveOptions && (
+          <div className="flex items-center gap-2 overflow-x-auto">
             {conversationStatus === "active" && (
               <Button
-                variant="default"
+                variant="outline"
                 size="sm"
                 onClick={handleTakeConversation}
-                className="bg-blue-600 hover:bg-blue-700"
+                className="text-blue-600 border-blue-200 hover:bg-blue-50 dark:hover:bg-blue-950 h-9 md:h-8 shrink-0"
               >
-                <User className="h-4 w-4 mr-1" />
-                Tomar conversación
+                <UserCheck className="h-3.5 w-3.5 mr-1.5" />
+                Tomar control
               </Button>
             )}
             <Button
               variant="outline"
               size="sm"
-              className="text-destructive hover:text-destructive bg-transparent"
-              onClick={handleEscalate}
               disabled={conversationStatus === "escalated"}
+              onClick={() => {
+                setShowEscalateInput(true)
+                setShowResolveOptions(false)
+              }}
+              className="text-destructive border-destructive/20 hover:bg-destructive/5 h-9 md:h-8 shrink-0"
             >
-              <AlertTriangle className="h-4 w-4 mr-1" />
+              <AlertTriangle className="h-3.5 w-3.5 mr-1.5" />
               Escalar
             </Button>
             <Button
               variant="outline"
               size="sm"
-              onClick={handleResolve}
-            >
-              <CheckCircle className="h-4 w-4 mr-1" />
-              {conversationStatus === "human_handled" || conversationStatus === "escalated"
-                ? "Resolver / Reanudar IA"
-                : "Resolver"}
-            </Button>
-          </div>
-          <div className="flex gap-2">
-            <Input
-              placeholder="Escribe un mensaje..."
-              value={newMessage}
-              onChange={(e) => setNewMessage(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && !e.shiftKey) {
-                  e.preventDefault()
-                  handleSendMessage()
-                }
+              onClick={() => {
+                setShowResolveOptions(true)
+                setShowEscalateInput(false)
               }}
-              disabled={isSending}
-              className="flex-1 bg-background border-border text-foreground placeholder:text-muted-foreground"
-            />
-            <Button onClick={handleSendMessage} disabled={isSending || !newMessage.trim()}>
-              {isSending ? (
-                <Clock className="h-4 w-4 animate-spin" />
-              ) : (
-                <Send className="h-4 w-4" />
-              )}
+              className="h-9 md:h-8 shrink-0"
+            >
+              <CheckCircle className="h-3.5 w-3.5 mr-1.5" />
+              Resolver
             </Button>
           </div>
+        )}
+
+        {/* Message input */}
+        <div className="flex gap-2 items-end">
+          <Textarea
+            ref={inputRef}
+            placeholder={isMobile ? "Escribe un mensaje…" : "Escribe un mensaje… (Enter para enviar, Shift+Enter para salto de línea)"}
+            value={newMessage}
+            onChange={(e) => {
+              setNewMessage(e.target.value)
+              e.target.style.height = "auto"
+              e.target.style.height = Math.min(e.target.scrollHeight, 120) + "px"
+            }}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault()
+                handleSendMessage()
+              }
+            }}
+            disabled={isSending}
+            rows={1}
+            className="flex-1 resize-none text-sm overflow-hidden text-base md:text-sm"
+            style={{ minHeight: "44px", maxHeight: "120px", height: "44px" }}
+          />
+          <Button
+            size="icon"
+            onClick={handleSendMessage}
+            disabled={isSending || !newMessage.trim()}
+            className="shrink-0 h-11 w-11 md:h-10 md:w-10 rounded-full md:rounded-md"
+          >
+            {isSending ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Send className="h-4 w-4" />
+            )}
+          </Button>
         </div>
-      </SheetContent>
-    </Sheet>
+      </div>
+    </div>
   )
 }
+
+// ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function ConversationsPage() {
   const { user } = useAuth()
   const searchParams = useSearchParams()
   const { toast } = useToast()
+  const isMobile = useIsMobile()
+
   const [search, setSearch] = useState("")
-  const [statusFilter, setStatusFilter] = useState<string>("all")
-  const [selectedConversation, setSelectedConversation] =
-    useState<Conversation | null>(null)
-  const [sheetOpen, setSheetOpen] = useState(false)
+  const [statusFilter, setStatusFilter] = useState("all")
+  const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null)
   const [conversations, setConversations] = useState<Conversation[]>([])
   const [isLoading, setIsLoading] = useState(true)
-  const [stats, setStats] = useState({ active: 0, human_handled: 0, escalated: 0, resolved: 0 })
-  const openCustomerIdRef = useRef<string | null>(null)
+  const [stats, setStats] = useState({
+    active: 0,
+    human_handled: 0,
+    escalated: 0,
+    resolved: 0,
+  })
 
-  // Cargar conversaciones
+  const openedFromParamRef = useRef(false)
+  const selectedIdRef = useRef<number | null>(null)
+
+  const loadConversations = useCallback(
+    async (silent = false) => {
+      if (!user?.id) return
+      try {
+        if (!silent) setIsLoading(true)
+        const params = new URLSearchParams({ client_id: String(user.id) })
+        if (statusFilter !== "all") params.set("status_filter", statusFilter)
+        const res = await fetch(`/api/admin/conversations?${params}`)
+        if (!res.ok) throw new Error("Error")
+        const data = await res.json()
+
+        const formatted: Conversation[] = (data.conversations ?? []).map(
+          (conv: any, i: number) => ({
+            id: i + 1,
+            customer_id: conv.customer_id,
+            phone_number: conv.phone_number,
+            customer_name: conv.customer_name,
+            last_message: conv.last_message,
+            last_message_at: conv.last_message_time,
+            last_message_time: conv.last_message_time,
+            status: conv.status,
+            message_count: conv.message_count,
+            is_escalated: conv.is_escalated,
+            is_human_handled: conv.is_human_handled,
+            admin: conv.admin,
+            escalation_reason: conv.escalation_reason,
+          })
+        )
+
+        setConversations(formatted)
+        setStats({
+          active: data.active ?? 0,
+          human_handled: data.human_handled ?? 0,
+          escalated: data.escalated ?? 0,
+          resolved: data.resolved ?? 0,
+        })
+
+        if (selectedIdRef.current !== null) {
+          const updated = formatted.find(
+            (c) => c.customer_id === selectedIdRef.current
+          )
+          if (updated) setSelectedConversation(updated)
+        }
+      } catch {
+        if (!silent)
+          toast({
+            title: "Error",
+            description: "No se pudieron cargar las conversaciones",
+            variant: "destructive",
+          })
+      } finally {
+        if (!silent) setIsLoading(false)
+      }
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [user?.id, statusFilter]
+  )
+
   useEffect(() => {
     loadConversations()
+    const iv = setInterval(() => loadConversations(true), 10000)
+    return () => clearInterval(iv)
+  }, [user?.id, statusFilter]) // eslint-disable-line react-hooks/exhaustive-deps
 
-    const interval = setInterval(() => {
-      loadConversations(true)
-    }, 10000)
-
-    return () => clearInterval(interval)
-  }, [user?.id, statusFilter])
-
-  // Abrir conversación desde ?open=customer_id (ej: desde Clientes)
+  // Open from ?open=customer_id
   useEffect(() => {
     const openId = searchParams.get("open")
-    if (openId && conversations.length > 0 && !openCustomerIdRef.current) {
-      openCustomerIdRef.current = openId
+    if (openId && conversations.length > 0 && !openedFromParamRef.current) {
+      openedFromParamRef.current = true
       const conv = conversations.find((c) => c.customer_id === parseInt(openId))
       if (conv) {
         setSelectedConversation(conv)
-        setSheetOpen(true)
+        selectedIdRef.current = conv.customer_id
       }
     }
   }, [searchParams, conversations])
 
-  const loadConversations = async (silent = false) => {
-    if (!user?.id) return
-
-    try {
-      if (!silent) setIsLoading(true)
-      const response = await fetch(
-        `/api/admin/conversations?client_id=${user.id}${statusFilter !== "all" ? `&status_filter=${statusFilter}` : ""}`
-      )
-      if (!response.ok) throw new Error("Failed to load conversations")
-
-      const data = await response.json()
-
-      // Mapear a formato Conversation con id
-      const formattedConversations: Conversation[] = data.conversations.map((conv: any, index: number) => ({
-        id: index + 1,
-        customer_id: conv.customer_id,
-        phone_number: conv.phone_number,
-        customer_name: conv.customer_name,
-        last_message: conv.last_message,
-        last_message_at: conv.last_message_time,
-        last_message_time: conv.last_message_time,
-        status: conv.status,
-        message_count: conv.message_count,
-        is_escalated: conv.is_escalated,
-        is_human_handled: conv.is_human_handled,
-        admin: conv.admin,
-        escalation_reason: conv.escalation_reason,
-      }))
-
-      setConversations(formattedConversations)
-      setStats({
-        active: data.active || 0,
-        human_handled: data.human_handled || 0,
-        escalated: data.escalated || 0,
-        resolved: data.resolved || 0,
-      })
-    } catch (error) {
-      console.error("Error loading conversations:", error)
-      toast({
-        title: "Error",
-        description: "No se pudieron cargar las conversaciones",
-        variant: "destructive",
-      })
-    } finally {
-      if (!silent) setIsLoading(false)
-    }
+  const handleSelect = (conv: Conversation) => {
+    setSelectedConversation(conv)
+    selectedIdRef.current = conv.customer_id
   }
 
-  const filteredConversations = conversations.filter((conv) => {
-    const matchesSearch =
-      conv.customer_name?.toLowerCase().includes(search.toLowerCase()) ||
-      conv.phone_number.includes(search) ||
-      conv.last_message.toLowerCase().includes(search.toLowerCase())
+  const handleBack = () => {
+    setSelectedConversation(null)
+    selectedIdRef.current = null
+  }
 
-    return matchesSearch
+  const filtered = conversations.filter((conv) => {
+    if (!search) return true
+    const q = search.toLowerCase()
+    return (
+      conv.customer_name?.toLowerCase().includes(q) ||
+      conv.phone_number.includes(q) ||
+      conv.last_message?.toLowerCase().includes(q)
+    )
   })
 
-  const handleSelectConversation = (conversation: Conversation) => {
-    setSelectedConversation(conversation)
-    setSheetOpen(true)
-  }
+  // On mobile, show either the list or the chat — not both
+  const showList = !isMobile || !selectedConversation
+  const showChat = !isMobile || !!selectedConversation
+
+  // ── JSX ─────────────────────────────────────────────────────────────────────
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">Conversaciones</h1>
-        <p className="text-muted-foreground">
-          Gestiona las conversaciones con tus clientes
-        </p>
-      </div>
-
-      {/* Filters */}
-      <div className="flex flex-col sm:flex-row gap-4">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Buscar por nombre, teléfono o mensaje..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="pl-9"
-          />
+    <div
+      className="-m-4 md:-m-6 flex flex-col overflow-hidden"
+      style={{ height: "calc(100dvh - 4rem)" }}
+    >
+      {/* Top stats bar — hidden on mobile when viewing chat */}
+      {(!isMobile || !selectedConversation) && (
+        <div className="flex items-center gap-3 md:gap-4 px-4 py-2.5 border-b bg-background shrink-0 overflow-x-auto">
+          <h1 className="text-sm font-semibold shrink-0">Conversaciones</h1>
+          <div className="h-4 w-px bg-border shrink-0 hidden md:block" />
+          <div className="flex items-center gap-3 text-xs shrink-0">
+            <span className="flex items-center gap-1.5">
+              <span className="h-2 w-2 rounded-full bg-green-500" />
+              <strong>{stats.active}</strong>
+              <span className="text-muted-foreground">IA</span>
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className="h-2 w-2 rounded-full bg-blue-500" />
+              <strong>{stats.human_handled}</strong>
+              <span className="text-muted-foreground">Tú</span>
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className="h-2 w-2 rounded-full bg-destructive" />
+              <strong>{stats.escalated}</strong>
+              <span className="text-muted-foreground hidden sm:inline">Escaladas</span>
+              <span className="text-muted-foreground sm:hidden">Esc</span>
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className="h-2 w-2 rounded-full bg-muted-foreground/40" />
+              <strong>{stats.resolved}</strong>
+              <span className="text-muted-foreground hidden sm:inline">Resueltas</span>
+              <span className="text-muted-foreground sm:hidden">Res</span>
+            </span>
+          </div>
         </div>
-        <Select value={statusFilter} onValueChange={setStatusFilter}>
-          <SelectTrigger className="w-full sm:w-[180px]">
-            <SelectValue placeholder="Filtrar por estado" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Todos</SelectItem>
-            <SelectItem value="active">IA respondiendo</SelectItem>
-            <SelectItem value="human_handled">Tú respondiendo</SelectItem>
-            <SelectItem value="escalated">Escaladas</SelectItem>
-            <SelectItem value="resolved">Resueltas</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
+      )}
 
-      {/* Stats */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-success/10">
-                <Bot className="h-5 w-5 text-success" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold">{stats.active}</p>
-                <p className="text-sm text-muted-foreground">IA respondiendo</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-500/10">
-                <User className="h-5 w-5 text-blue-600" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold">{stats.human_handled}</p>
-                <p className="text-sm text-muted-foreground">Tú respondiendo</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-destructive/10">
-                <AlertTriangle className="h-5 w-5 text-destructive" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold">{stats.escalated}</p>
-                <p className="text-sm text-muted-foreground">Escaladas</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-muted">
-                <CheckCircle className="h-5 w-5 text-muted-foreground" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold">{stats.resolved}</p>
-                <p className="text-sm text-muted-foreground">Resueltas</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Conversations List */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <MessageSquare className="h-5 w-5" />
-            Todas las Conversaciones
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="p-0">
-          <ScrollArea className="h-[500px]">
-            {isLoading ? (
-              <div className="flex items-center justify-center py-12">
-                <Clock className="h-6 w-6 animate-spin text-muted-foreground" />
-              </div>
-            ) : filteredConversations.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-12 text-center">
-                <MessageSquare className="h-12 w-12 text-muted-foreground/50 mb-4" />
-                <p className="text-lg font-medium">No hay conversaciones</p>
-                <p className="text-sm text-muted-foreground">
-                  No se encontraron conversaciones con los filtros actuales
-                </p>
-              </div>
-            ) : (
-              filteredConversations.map((conversation) => (
-                <ConversationItem
-                  key={conversation.id}
-                  conversation={conversation}
-                  isSelected={selectedConversation?.id === conversation.id}
-                  onClick={() => handleSelectConversation(conversation)}
+      {/* Split pane (desktop) / single pane (mobile) */}
+      <div className="flex flex-1 overflow-hidden">
+        {/* ── Left: conversation list ── */}
+        {showList && (
+          <div
+            className={`flex flex-col bg-background ${
+              isMobile
+                ? "w-full"
+                : "w-72 lg:w-80 border-r shrink-0"
+            }`}
+          >
+            {/* Search + filter */}
+            <div className="p-3 border-b space-y-2 shrink-0">
+              <div className="relative">
+                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+                <Input
+                  placeholder="Buscar conversación…"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  className="pl-8 h-9 md:h-8 text-sm"
                 />
-              ))
-            )}
-          </ScrollArea>
-        </CardContent>
-      </Card>
+              </div>
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger className="h-9 md:h-8 text-xs">
+                  <SelectValue placeholder="Todos los estados" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos los estados</SelectItem>
+                  <SelectItem value="active">IA respondiendo</SelectItem>
+                  <SelectItem value="human_handled">Tú respondiendo</SelectItem>
+                  <SelectItem value="escalated">Escaladas</SelectItem>
+                  <SelectItem value="resolved">Resueltas</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
 
-      {/* Conversation Detail Sheet */}
-      <ConversationDetail
-        conversation={selectedConversation}
-        open={sheetOpen}
-        onClose={() => setSheetOpen(false)}
-        clientId={user?.id}
-        businessName={user?.business_name}
-        onRefresh={loadConversations}
-      />
+            {/* List */}
+            <div className="flex-1 overflow-y-auto divide-y">
+              {isLoading ? (
+                <>
+                  {[1, 2, 3, 4, 5, 6].map((i) => (
+                    <div key={i} className="px-4 py-3.5 md:py-3 flex items-center gap-3">
+                      <Skeleton className="h-10 w-10 rounded-full shrink-0" />
+                      <div className="flex-1 space-y-2">
+                        <Skeleton className="h-3.5 w-28" />
+                        <Skeleton className="h-3 w-44" />
+                      </div>
+                    </div>
+                  ))}
+                </>
+              ) : filtered.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-16 px-6 text-center gap-2">
+                  <MessageSquare className="h-10 w-10 text-muted-foreground/20" />
+                  <p className="text-sm text-muted-foreground">
+                    {search ? "Sin resultados para tu búsqueda" : "Aún no hay conversaciones"}
+                  </p>
+                </div>
+              ) : (
+                filtered.map((conv) => (
+                  <ConversationItem
+                    key={conv.customer_id}
+                    conversation={conv}
+                    isSelected={!isMobile && selectedConversation?.customer_id === conv.customer_id}
+                    onClick={() => handleSelect(conv)}
+                  />
+                ))
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* ── Right: chat ── */}
+        {showChat && (
+          <div className="flex-1 overflow-hidden">
+            {selectedConversation ? (
+              <ChatPanel
+                key={selectedConversation.customer_id}
+                conversation={selectedConversation}
+                clientId={user?.id}
+                businessName={user?.business_name}
+                onRefresh={() => loadConversations(true)}
+                onBack={isMobile ? handleBack : undefined}
+              />
+            ) : (
+              <div className="flex flex-col items-center justify-center h-full gap-3 text-muted-foreground">
+                <MessageSquare className="h-14 w-14 opacity-15" />
+                <div className="text-center">
+                  <p className="font-medium text-foreground">Selecciona una conversación</p>
+                  <p className="text-sm mt-0.5">
+                    Elige una del panel izquierdo para ver los mensajes
+                  </p>
+                </div>
+                {filtered.length > 0 && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleSelect(filtered[0])}
+                    className="mt-1"
+                  >
+                    Abrir primera conversación
+                    <ChevronRight className="h-4 w-4 ml-1" />
+                  </Button>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
     </div>
   )
 }

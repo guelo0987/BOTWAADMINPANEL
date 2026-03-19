@@ -629,24 +629,24 @@ export default function BotConfigPage() {
       <Card>
         <CardContent className="p-4">
           <div className="flex flex-col gap-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+              <div className="flex items-center gap-4 min-w-0">
+                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-primary/10">
                   <Bot className="h-6 w-6 text-primary" />
                 </div>
-                <div>
-                  <p className="font-semibold">{config.business_name}</p>
-                  <p className="text-sm text-muted-foreground">
-                    ID: {config.whatsapp_instance_id}
+                <div className="min-w-0">
+                  <p className="font-semibold truncate">{config.business_name}</p>
+                  <p className="text-xs text-muted-foreground font-mono truncate">
+                    {config.whatsapp_instance_id}
                   </p>
                   {config.notification_email && (
-                    <p className="text-sm text-muted-foreground">
-                      Correo: {config.notification_email}
+                    <p className="text-xs text-muted-foreground truncate">
+                      {config.notification_email}
                     </p>
                   )}
                 </div>
               </div>
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-3 self-end sm:self-auto shrink-0">
                 <Label htmlFor="bot-active" className="text-sm">
                   Bot Activo
                 </Label>
@@ -689,31 +689,31 @@ export default function BotConfigPage() {
 
       <Tabs defaultValue="control" className="space-y-4">
         <TabsList className={`grid w-full ${(config.tools_config.business_type === "clinic" || config.tools_config.business_type === "salon") ? "grid-cols-6" : "grid-cols-5"}`}>
-          <TabsTrigger value="control">
-            <CalendarClock className="h-4 w-4 mr-2" />
-            Control
+          <TabsTrigger value="control" title="Control">
+            <CalendarClock className="h-4 w-4 md:mr-2" />
+            <span className="hidden md:inline">Control</span>
           </TabsTrigger>
-          <TabsTrigger value="business">
-            <Building2 className="h-4 w-4 mr-2" />
-            Negocio
+          <TabsTrigger value="business" title="Negocio">
+            <Building2 className="h-4 w-4 md:mr-2" />
+            <span className="hidden md:inline">Negocio</span>
           </TabsTrigger>
-          <TabsTrigger value="prompt">
-            <MessageSquare className="h-4 w-4 mr-2" />
-            Personalidad
+          <TabsTrigger value="prompt" title="Personalidad">
+            <MessageSquare className="h-4 w-4 md:mr-2" />
+            <span className="hidden md:inline">Personalidad</span>
           </TabsTrigger>
-          <TabsTrigger value="services">
-            <DollarSign className="h-4 w-4 mr-2" />
-            Servicios
+          <TabsTrigger value="services" title="Servicios">
+            <DollarSign className="h-4 w-4 md:mr-2" />
+            <span className="hidden md:inline">Servicios</span>
           </TabsTrigger>
           {(config.tools_config.business_type === "clinic" || config.tools_config.business_type === "salon") && (
-            <TabsTrigger value="team">
-              <Users className="h-4 w-4 mr-2" />
-              Equipo
+            <TabsTrigger value="team" title="Equipo">
+              <Users className="h-4 w-4 md:mr-2" />
+              <span className="hidden md:inline">Equipo</span>
             </TabsTrigger>
           )}
-          <TabsTrigger value="email">
-            <Mail className="h-4 w-4 mr-2" />
-            Email
+          <TabsTrigger value="email" title="Email">
+            <Mail className="h-4 w-4 md:mr-2" />
+            <span className="hidden md:inline">Email</span>
           </TabsTrigger>
         </TabsList>
 
