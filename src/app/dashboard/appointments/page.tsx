@@ -237,6 +237,11 @@ function AgendaCard({
           <span className="text-xs bg-muted text-muted-foreground px-2 py-0.5 rounded-full">
             {duration}
           </span>
+          {appointment.total_price != null && (
+            <span className="text-xs font-semibold text-green-700 bg-green-100 px-2 py-0.5 rounded-full">
+              ${appointment.total_price.toLocaleString()}
+            </span>
+          )}
         </div>
 
         {/* Notes */}

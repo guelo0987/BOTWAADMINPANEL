@@ -42,6 +42,7 @@ export async function GET(req: Request) {
                 end_time: apt.end_time.toISOString(),
                 status: apt.status,
                 notes: apt.notes,
+                total_price: apt.total_price ? Number(apt.total_price) : null,
                 customer: apt.customer,
             }))
         )

@@ -63,6 +63,7 @@ export async function PATCH(
             end_time: cancelledAppointment.end_time.toISOString(),
             status: cancelledAppointment.status,
             notes: cancelledAppointment.notes,
+            total_price: cancelledAppointment.total_price ? Number(cancelledAppointment.total_price) : null,
             customer: cancelledAppointment.customer,
         })
     } catch (error: any) {

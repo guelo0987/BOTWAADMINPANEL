@@ -131,6 +131,7 @@ export interface Appointment {
   end_time: string
   status: "CONFIRMED" | "CANCELLED" | "NO_SHOW" | "COMPLETED"
   notes: string | null
+  total_price: number | null
   customer?: {
     id: number
     full_name: string | null
