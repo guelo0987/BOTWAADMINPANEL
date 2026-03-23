@@ -1255,6 +1255,28 @@ export default function BotConfigPage() {
                 )}
               </div>
 
+              {/* Permitir citas en el mismo horario */}
+              <div className="flex items-center justify-between rounded-lg border p-4">
+                <div className="space-y-0.5">
+                  <Label className="text-sm font-medium">Permitir citas en el mismo horario</Label>
+                  <p className="text-xs text-muted-foreground">
+                    Permite que varios clientes agenden en la misma hora. Útil para entregas, restaurantes con capacidad o negocios con múltiples atenciones simultáneas.
+                  </p>
+                </div>
+                <Switch
+                  checked={config.tools_config.allow_overlapping_appointments ?? false}
+                  onCheckedChange={(checked) =>
+                    setConfig({
+                      ...config,
+                      tools_config: {
+                        ...config.tools_config,
+                        allow_overlapping_appointments: checked,
+                      },
+                    })
+                  }
+                />
+              </div>
+
               <Separator />
 
               {/* Calendar ID - Solo para salon, restaurant, general (NO para clinic ni store) */}

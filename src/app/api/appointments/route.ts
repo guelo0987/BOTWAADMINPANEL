@@ -42,6 +42,7 @@ export async function GET(req: Request) {
                 end_time: apt.end_time.toISOString(),
                 status: apt.status,
                 notes: apt.notes,
+                total_price: apt.total_price ? Number(apt.total_price) : null,
                 customer: apt.customer,
             }))
         )
@@ -129,6 +130,7 @@ export async function POST(req: Request) {
             end_time: appointment.end_time.toISOString(),
             status: appointment.status,
             notes: appointment.notes,
+            total_price: appointment.total_price ? Number(appointment.total_price) : null,
             customer: appointment.customer,
         })
     } catch (error: any) {

@@ -92,6 +92,9 @@ export interface ToolsConfig {
   /** Duración en minutos por slot de entrega (store, default 60). */
   delivery_duration?: number
 
+  /** Permitir múltiples citas/entregas en el mismo horario (ej: varias entregas a la misma hora). */
+  allow_overlapping_appointments?: boolean
+
   /** Horario programado del bot: si está activo, el bot solo funciona en el rango definido. */
   bot_schedule_enabled?: boolean
   /** Hora de inicio del horario del bot (HH:mm). */
@@ -131,6 +134,7 @@ export interface Appointment {
   end_time: string
   status: "CONFIRMED" | "CANCELLED" | "NO_SHOW" | "COMPLETED"
   notes: string | null
+  total_price: number | null
   customer?: {
     id: number
     full_name: string | null

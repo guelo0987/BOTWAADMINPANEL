@@ -86,6 +86,7 @@ export async function PUT(
             end_time: updatedAppointment.end_time.toISOString(),
             status: updatedAppointment.status,
             notes: updatedAppointment.notes,
+            total_price: updatedAppointment.total_price ? Number(updatedAppointment.total_price) : null,
             customer: updatedAppointment.customer,
         })
     } catch (error: any) {

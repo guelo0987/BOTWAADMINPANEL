@@ -239,13 +239,20 @@ function AgendaCard({
           </span>
         </div>
 
-        {/* Notes */}
-        {appointment.notes && (
-          <p className="text-xs text-muted-foreground mt-1 flex items-start gap-1 line-clamp-1">
-            <FileText className="h-3 w-3 mt-0.5 shrink-0" />
-            {appointment.notes}
-          </p>
-        )}
+        {/* Price + Notes */}
+        <div className="flex items-center gap-2 mt-1 flex-wrap">
+          {appointment.total_price != null && (
+            <span className="text-xs font-semibold text-green-600 bg-green-50 px-1.5 py-0.5 rounded">
+              ${appointment.total_price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </span>
+          )}
+          {appointment.notes && (
+            <p className="text-xs text-muted-foreground flex items-start gap-1 line-clamp-1">
+              <FileText className="h-3 w-3 mt-0.5 shrink-0" />
+              {appointment.notes}
+            </p>
+          )}
+        </div>
 
         {/* Quick actions — only for CONFIRMED */}
         {appointment.status === "CONFIRMED" && (
@@ -704,6 +711,15 @@ function AppointmentDialog({
               rows={3}
             />
           </div>
+
+          {appointment?.total_price != null && (
+            <div className="space-y-2">
+              <Label>Precio</Label>
+              <p className="text-sm font-semibold text-green-600">
+                ${appointment.total_price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </p>
+            </div>
+          )}
         </div>
 
         <DialogFooter>
