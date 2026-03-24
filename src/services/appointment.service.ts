@@ -39,6 +39,8 @@ export const getUpcomingAppointments = async (clientId?: number): Promise<Appoin
                 end_time: apt.end_time.toISOString(),
                 status: apt.status as "CONFIRMED" | "CANCELLED" | "COMPLETED" | "NO_SHOW",
                 notes: apt.notes,
+                total_price: apt.total_price ? Number(apt.total_price) : null,
+                invoice_name: apt.invoice_name,
                 customer: apt.customer,
             }))
         } catch (error) {
@@ -104,6 +106,8 @@ export const getAllAppointments = async (clientId?: number): Promise<Appointment
                 end_time: apt.end_time.toISOString(),
                 status: apt.status as "CONFIRMED" | "CANCELLED" | "COMPLETED" | "NO_SHOW",
                 notes: apt.notes,
+                total_price: apt.total_price ? Number(apt.total_price) : null,
+                invoice_name: apt.invoice_name,
                 customer: apt.customer,
             }))
         } catch (error) {

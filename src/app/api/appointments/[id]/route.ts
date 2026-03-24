@@ -65,6 +65,7 @@ export async function PUT(
                 ...(end_time && { end_time: new Date(end_time) }),
                 ...(notes !== undefined && { notes: notes || null }),
                 ...(status && { status }),
+                ...(body.invoice_name !== undefined && { invoice_name: body.invoice_name || null }),
             },
             include: {
                 customer: {
@@ -87,6 +88,7 @@ export async function PUT(
             status: updatedAppointment.status,
             notes: updatedAppointment.notes,
             total_price: updatedAppointment.total_price ? Number(updatedAppointment.total_price) : null,
+            invoice_name: updatedAppointment.invoice_name,
             customer: updatedAppointment.customer,
         })
     } catch (error: any) {

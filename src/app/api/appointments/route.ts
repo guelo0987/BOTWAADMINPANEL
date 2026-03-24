@@ -43,6 +43,7 @@ export async function GET(req: Request) {
                 status: apt.status,
                 notes: apt.notes,
                 total_price: apt.total_price ? Number(apt.total_price) : null,
+                invoice_name: apt.invoice_name,
                 customer: apt.customer,
             }))
         )
@@ -131,6 +132,7 @@ export async function POST(req: Request) {
             status: appointment.status,
             notes: appointment.notes,
             total_price: appointment.total_price ? Number(appointment.total_price) : null,
+            invoice_name: appointment.invoice_name,
             customer: appointment.customer,
         })
     } catch (error: any) {

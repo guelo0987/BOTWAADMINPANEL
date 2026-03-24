@@ -246,6 +246,11 @@ function AgendaCard({
               ${appointment.total_price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </span>
           )}
+          {appointment.invoice_name && (
+            <span className="text-xs text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded">
+              📋 {appointment.invoice_name}
+            </span>
+          )}
           {appointment.notes && (
             <p className="text-xs text-muted-foreground flex items-start gap-1 line-clamp-1">
               <FileText className="h-3 w-3 mt-0.5 shrink-0" />
@@ -718,6 +723,12 @@ function AppointmentDialog({
               <p className="text-sm font-semibold text-green-600">
                 ${appointment.total_price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </p>
+            </div>
+          )}
+          {appointment?.invoice_name && (
+            <div className="space-y-2">
+              <Label>A nombre de</Label>
+              <p className="text-sm">{appointment.invoice_name}</p>
             </div>
           )}
         </div>

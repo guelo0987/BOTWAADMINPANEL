@@ -28,6 +28,8 @@ import {
   ChevronRight,
   UserCheck,
   ArrowLeft,
+  Mic,
+  Square,
 } from "lucide-react"
 import type { Conversation, Message } from "@/types"
 import { useToast } from "@/hooks/use-toast"
@@ -219,7 +221,14 @@ function MessageBubble({
               : "bg-muted rounded-tl-none"
           }`}
         >
-          <p className="whitespace-pre-wrap break-words">{message.content}</p>
+          {message.media_type === "audio" ? (
+            <div className="flex items-center gap-2 py-0.5">
+              <Mic className="h-4 w-4 shrink-0 opacity-60" />
+              <span className="italic text-sm opacity-80">Nota de voz</span>
+            </div>
+          ) : (
+            <p className="whitespace-pre-wrap break-words">{message.content}</p>
+          )}
         </div>
         {showTime && message.timestamp && (
           <p
@@ -258,6 +267,13 @@ function ChatPanel({
   const [showEscalateInput, setShowEscalateInput] = useState(false)
   const [escalateReason, setEscalateReason] = useState("")
   const [showResolveOptions, setShowResolveOptions] = useState(false)
+  const [isRecording, setIsRecording] = useState(false)
+  const [recordingSeconds, setRecordingSeconds] = useState(0)
+  const [isSendingAudio, setIsSendingAudio] = useState(false)
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null)
+  const audioChunksRef = useRef<Blob[]>([])
+  const recordingTimerRef = useRef<NodeJS.Timeout | null>(null)
+  const streamRef = useRef<MediaStream | null>(null)
 
   const isMobile = useIsMobile()
   const { toast } = useToast()
@@ -287,6 +303,7 @@ function ChatPanel({
           sender:
             msg.role === "user" ? "customer" : msg.human ? "agent" : ("bot" as const),
           timestamp: msg.timestamp || new Date().toISOString(),
+          media_type: msg.media_type || undefined,
         }))
 
         setMessages(formatted)
@@ -375,6 +392,131 @@ function ChatPanel({
     } finally {
       setIsSending(false)
       inputRef.current?.focus()
+    }
+  }
+
+  const startRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      streamRef.current = stream
+
+      // Intentar OGG (ideal para WhatsApp), fallback a WebM
+      const mimeType = MediaRecorder.isTypeSupported("audio/ogg;codecs=opus")
+        ? "audio/ogg;codecs=opus"
+        : "audio/webm;codecs=opus"
+
+      const recorder = new MediaRecorder(stream, { mimeType })
+      audioChunksRef.current = []
+
+      recorder.ondataavailable = (e) => {
+        if (e.data.size > 0) audioChunksRef.current.push(e.data)
+      }
+
+      recorder.onstop = () => {
+        stream.getTracks().forEach((t) => t.stop())
+        streamRef.current = null
+        if (recordingTimerRef.current) {
+          clearInterval(recordingTimerRef.current)
+          recordingTimerRef.current = null
+        }
+        const blob = new Blob(audioChunksRef.current, { type: mimeType })
+        if (blob.size > 0) {
+          sendVoiceMessage(blob)
+        }
+      }
+
+      recorder.start(250) // Recoger data cada 250ms
+      mediaRecorderRef.current = recorder
+      setIsRecording(true)
+      setRecordingSeconds(0)
+
+      // Timer visual
+      recordingTimerRef.current = setInterval(() => {
+        setRecordingSeconds((s) => {
+          if (s >= 59) {
+            // Máximo 60 segundos
+            mediaRecorderRef.current?.stop()
+            setIsRecording(false)
+            return 0
+          }
+          return s + 1
+        })
+      }, 1000)
+    } catch {
+      toast({
+        title: "Error",
+        description: "No se pudo acceder al micrófono. Verifica los permisos del navegador.",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const cancelRecording = () => {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
+      // Limpiar chunks antes de stop para que onstop no envíe
+      audioChunksRef.current = []
+      mediaRecorderRef.current.stop()
+    }
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((t) => t.stop())
+      streamRef.current = null
+    }
+    if (recordingTimerRef.current) {
+      clearInterval(recordingTimerRef.current)
+      recordingTimerRef.current = null
+    }
+    setIsRecording(false)
+    setRecordingSeconds(0)
+  }
+
+  const stopAndSendRecording = () => {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
+      mediaRecorderRef.current.stop() // onstop handler will call sendVoiceMessage
+    }
+    setIsRecording(false)
+    setRecordingSeconds(0)
+  }
+
+  const sendVoiceMessage = async (audioBlob: Blob) => {
+    if (!conversation?.customer_id || !clientId) return
+
+    // Mensaje optimista
+    const optimistic: Message = {
+      id: messages.length + 1,
+      conversation_id: conversation.customer_id,
+      content: "[Nota de voz]",
+      sender: "agent",
+      timestamp: new Date().toISOString(),
+      media_type: "audio",
+    }
+    setMessages((prev) => [...prev, optimistic])
+    scrollToBottom()
+
+    try {
+      setIsSendingAudio(true)
+      const formData = new FormData()
+      formData.append("audio", audioBlob, "audio.ogg")
+      formData.append("client_id", String(clientId))
+      formData.append("admin_name", businessName || "")
+
+      const res = await fetch(
+        `/api/admin/conversations/${conversation.customer_id}/send-audio`,
+        { method: "POST", body: formData }
+      )
+
+      if (!res.ok) {
+        const errData = await res.json()
+        throw new Error(errData.error || "Error enviando audio")
+      }
+
+      setConversationStatus("human_handled")
+      onRefresh()
+      await loadMessages(true)
+    } catch (error: any) {
+      setMessages((prev) => prev.filter((m) => m !== optimistic))
+      toast({ title: "Error al enviar audio", description: error.message, variant: "destructive" })
+    } finally {
+      setIsSendingAudio(false)
     }
   }
 
@@ -665,40 +807,85 @@ function ChatPanel({
         )}
 
         {/* Message input */}
-        <div className="flex gap-2 items-end">
-          <Textarea
-            ref={inputRef}
-            placeholder={isMobile ? "Escribe un mensaje…" : "Escribe un mensaje… (Enter para enviar, Shift+Enter para salto de línea)"}
-            value={newMessage}
-            onChange={(e) => {
-              setNewMessage(e.target.value)
-              e.target.style.height = "auto"
-              e.target.style.height = Math.min(e.target.scrollHeight, 120) + "px"
-            }}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.shiftKey) {
-                e.preventDefault()
-                handleSendMessage()
-              }
-            }}
-            disabled={isSending}
-            rows={1}
-            className="flex-1 resize-none text-sm overflow-hidden text-base md:text-sm"
-            style={{ minHeight: "44px", maxHeight: "120px", height: "44px" }}
-          />
-          <Button
-            size="icon"
-            onClick={handleSendMessage}
-            disabled={isSending || !newMessage.trim()}
-            className="shrink-0 h-11 w-11 md:h-10 md:w-10 rounded-full md:rounded-md"
-          >
-            {isSending ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
+        {isRecording ? (
+          <div className="flex gap-2 items-center bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900 rounded-lg px-3 py-2">
+            <span className="flex items-center gap-2 flex-1">
+              <span className="h-2.5 w-2.5 rounded-full bg-red-500 animate-pulse" />
+              <span className="text-sm font-medium text-red-600 dark:text-red-400">
+                Grabando… {recordingSeconds}s
+              </span>
+            </span>
+            <Button
+              size="icon"
+              variant="ghost"
+              onClick={cancelRecording}
+              className="shrink-0 h-9 w-9 text-muted-foreground hover:text-destructive"
+              title="Cancelar"
+            >
+              <Square className="h-4 w-4" />
+            </Button>
+            <Button
+              size="icon"
+              onClick={stopAndSendRecording}
+              className="shrink-0 h-11 w-11 md:h-10 md:w-10 rounded-full md:rounded-md bg-red-500 hover:bg-red-600"
+              title="Enviar nota de voz"
+            >
               <Send className="h-4 w-4" />
+            </Button>
+          </div>
+        ) : (
+          <div className="flex gap-2 items-end">
+            <Textarea
+              ref={inputRef}
+              placeholder={isMobile ? "Escribe un mensaje…" : "Escribe un mensaje… (Enter para enviar, Shift+Enter para salto de línea)"}
+              value={newMessage}
+              onChange={(e) => {
+                setNewMessage(e.target.value)
+                e.target.style.height = "auto"
+                e.target.style.height = Math.min(e.target.scrollHeight, 120) + "px"
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault()
+                  handleSendMessage()
+                }
+              }}
+              disabled={isSending || isSendingAudio}
+              rows={1}
+              className="flex-1 resize-none text-sm overflow-hidden text-base md:text-sm"
+              style={{ minHeight: "44px", maxHeight: "120px", height: "44px" }}
+            />
+            {newMessage.trim() ? (
+              <Button
+                size="icon"
+                onClick={handleSendMessage}
+                disabled={isSending || !newMessage.trim()}
+                className="shrink-0 h-11 w-11 md:h-10 md:w-10 rounded-full md:rounded-md"
+              >
+                {isSending ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Send className="h-4 w-4" />
+                )}
+              </Button>
+            ) : (
+              <Button
+                size="icon"
+                variant="outline"
+                onClick={startRecording}
+                disabled={isSendingAudio}
+                className="shrink-0 h-11 w-11 md:h-10 md:w-10 rounded-full md:rounded-md"
+                title="Enviar nota de voz"
+              >
+                {isSendingAudio ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Mic className="h-4 w-4" />
+                )}
+              </Button>
             )}
-          </Button>
-        </div>
+          </div>
+        )}
       </div>
     </div>
   )

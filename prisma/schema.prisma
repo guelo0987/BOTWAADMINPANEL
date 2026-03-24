@@ -78,6 +78,7 @@ model Appointment {
   status          String   @default("CONFIRMED")
   notes           String?
   total_price     Decimal? @db.Decimal(12, 2)
+  invoice_name    String?
   client          Client   @relation(fields: [client_id], references: [id])
   customer        Customer @relation(fields: [customer_id], references: [id])
 

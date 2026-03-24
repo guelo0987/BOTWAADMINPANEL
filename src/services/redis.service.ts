@@ -67,14 +67,18 @@ export class ConversationMemory {
     }
 
     // Agregar mensaje de humano
-    async addHumanMessage(content: string, adminName = "Agente"): Promise<void> {
-        const message = JSON.stringify({
+    async addHumanMessage(content: string, adminName = "Agente", mediaType?: string): Promise<void> {
+        const msg: Record<string, any> = {
             role: "assistant",
             content,
             human: true,
             admin: adminName,
             timestamp: new Date().toISOString()
-        })
+        }
+        if (mediaType) {
+            msg.media_type = mediaType
+        }
+        const message = JSON.stringify(msg)
 
         await redisClient.rPush(this.key, message)
         await redisClient.lTrim(this.key, -20, -1) // Mantener últimos 20
