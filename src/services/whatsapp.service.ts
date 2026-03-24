@@ -21,10 +21,14 @@ export const uploadWhatsAppMedia = async (
     const apiVersion = credentials.apiVersion || "v21.0"
     const url = `https://graph.facebook.com/${apiVersion}/${credentials.phoneNumberId}/media`
 
+    // WhatsApp only supports: audio/ogg, audio/mpeg, audio/aac, audio/mp4, audio/amr
+    // Browsers often record as audio/webm (opus codec) — remap to audio/ogg which WA accepts
+    const whatsappMimeType = mimeType.includes("webm") ? "audio/ogg" : mimeType.split(";")[0]
+
     const formData = new FormData()
-    const blob = new Blob([new Uint8Array(audioBuffer)], { type: mimeType })
+    const blob = new Blob([new Uint8Array(audioBuffer)], { type: whatsappMimeType })
     formData.append("file", blob, "audio.ogg")
-    formData.append("type", mimeType)
+    formData.append("type", whatsappMimeType)
     formData.append("messaging_product", "whatsapp")
 
     const response = await fetch(url, {
