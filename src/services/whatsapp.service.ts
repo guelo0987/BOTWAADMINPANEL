@@ -21,15 +21,12 @@ export const uploadWhatsAppMedia = async (
     const apiVersion = credentials.apiVersion || "v21.0"
     const url = `https://graph.facebook.com/${apiVersion}/${credentials.phoneNumberId}/media`
 
-    // WhatsApp acepta: audio/aac, audio/mp4, audio/mpeg, audio/amr, audio/ogg, audio/opus
-    // Chrome graba audio/webm;codecs=opus → declaramos audio/ogg (mismo codec Opus, WhatsApp lo acepta)
-    // Firefox graba audio/ogg;codecs=opus → directo
-    // Safari graba audio/mp4 → directo
+    // Audio should already be converted to a WhatsApp-accepted format before calling this function.
+    // Accepted: audio/aac, audio/mp4, audio/mpeg, audio/amr, audio/ogg, audio/opus
     const baseType = mimeType.split(";")[0].trim()
-    const whatsappType = baseType === "audio/webm" ? "audio/ogg" : baseType
-    const ext = whatsappType.includes("ogg") || whatsappType.includes("opus") ? "ogg" : whatsappType.includes("mp4") ? "m4a" : "ogg"
+    const ext = baseType.includes("ogg") || baseType.includes("opus") ? "ogg" : baseType.includes("mp4") ? "m4a" : baseType.includes("aac") ? "aac" : baseType.includes("mpeg") ? "mp3" : "ogg"
 
-    console.log("[uploadWhatsAppMedia] mimeType original=%s → baseType=%s → whatsappType=%s ext=%s bufferSize=%d", mimeType, baseType, whatsappType, ext, audioBuffer.length)
+    console.log("[uploadWhatsAppMedia] mimeType=%s → baseType=%s ext=%s bufferSize=%d", mimeType, baseType, ext, audioBuffer.length)
 
     const formData = new FormData()
     const blob = new Blob([new Uint8Array(audioBuffer)], { type: baseType })
