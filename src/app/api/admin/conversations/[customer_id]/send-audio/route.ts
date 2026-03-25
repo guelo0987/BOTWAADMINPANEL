@@ -20,6 +20,14 @@ export async function POST(
         const adminName = formData.get("admin_name") as string | null
         const { customer_id } = await params
 
+        console.log("[send-audio] Recibido:", {
+            customer_id,
+            client_id: clientIdStr,
+            audioName: audioFile?.name,
+            audioType: audioFile?.type,
+            audioSize: audioFile?.size,
+        })
+
         if (!clientIdStr || !audioFile) {
             return NextResponse.json(
                 { error: "Missing required fields (audio, client_id)" },
@@ -29,6 +37,7 @@ export async function POST(
 
         const clientIdNum = parseInt(clientIdStr, 10)
         if (clientIdNum !== user.id) {
+            console.error("[send-audio] Forbidden: user.id=%d clientId=%d", user.id, clientIdNum)
             return NextResponse.json({ error: "Forbidden" }, { status: 403 })
         }
 
@@ -40,6 +49,7 @@ export async function POST(
         })
 
         if (!customer) {
+            console.error("[send-audio] Customer not found: customer_id=%s client_id=%d", customer_id, clientIdNum)
             return NextResponse.json(
                 { error: "Customer not found" },
                 { status: 404 }
@@ -57,6 +67,7 @@ export async function POST(
         })
 
         if (!client?.whatsapp_access_token || !client?.whatsapp_instance_id) {
+            console.error("[send-audio] WhatsApp credentials missing for client_id=%d", clientIdNum)
             return NextResponse.json(
                 {
                     error: "Este cliente no tiene configuradas las credenciales de WhatsApp.",
@@ -66,6 +77,12 @@ export async function POST(
         }
 
         const cleanPhone = customer.phone_number.replace(/[+\s-()]/g, "")
+        console.log("[send-audio] Enviando a phone=%s phoneNumberId=%s apiVersion=%s",
+            cleanPhone,
+            client.whatsapp_instance_id,
+            client.whatsapp_api_version ?? "v21.0"
+        )
+
         const credentials = {
             phoneNumberId: client.whatsapp_instance_id,
             accessToken: client.whatsapp_access_token,
@@ -75,13 +92,17 @@ export async function POST(
         // 1) Convertir File a Buffer
         const arrayBuffer = await audioFile.arrayBuffer()
         const buffer = Buffer.from(arrayBuffer)
+        console.log("[send-audio] Buffer size=%d bytes, mimeType=%s", buffer.length, audioFile.type)
 
         // 2) Subir audio a WhatsApp
         const mimeType = audioFile.type || "audio/ogg"
         let mediaId: string
         try {
+            console.log("[send-audio] Subiendo media a WhatsApp con mimeType=%s", mimeType)
             mediaId = await uploadWhatsAppMedia(buffer, mimeType, credentials)
+            console.log("[send-audio] Upload exitoso, mediaId=%s", mediaId)
         } catch (uploadError: any) {
+            console.error("[send-audio] UPLOAD FALLÓ:", uploadError.message)
             return NextResponse.json(
                 { error: "Error subiendo audio a WhatsApp", details: uploadError.message },
                 { status: 500 }
@@ -91,13 +112,16 @@ export async function POST(
         // 3) Enviar mensaje de audio
         let whatsappResponse
         try {
+            console.log("[send-audio] Enviando mensaje de audio a to=%s mediaId=%s", cleanPhone, mediaId)
             whatsappResponse = await sendWhatsAppAudio(
                 cleanPhone,
                 mediaId,
                 credentials,
                 clientIdNum
             )
+            console.log("[send-audio] Mensaje enviado OK:", JSON.stringify(whatsappResponse))
         } catch (sendError: any) {
+            console.error("[send-audio] SEND FALLÓ:", sendError.message)
             return NextResponse.json(
                 { error: "Error enviando audio a WhatsApp", details: sendError.message },
                 { status: 500 }
@@ -124,6 +148,7 @@ export async function POST(
             phone_number: cleanPhone,
         })
     } catch (error: any) {
+        console.error("[send-audio] ERROR inesperado:", error)
         return NextResponse.json(
             { error: error.message || "Internal Server Error" },
             { status: 500 }

@@ -28,6 +28,8 @@ export const uploadWhatsAppMedia = async (
     const baseType = mimeType.split(";")[0].trim()
     const ext = baseType.includes("ogg") ? "ogg" : baseType.includes("mp4") ? "m4a" : "webm"
 
+    console.log("[uploadWhatsAppMedia] mimeType original=%s → baseType=%s ext=%s bufferSize=%d", mimeType, baseType, ext, audioBuffer.length)
+
     const formData = new FormData()
     const blob = new Blob([new Uint8Array(audioBuffer)], { type: baseType })
     formData.append("file", blob, `audio.${ext}`)
@@ -43,6 +45,8 @@ export const uploadWhatsAppMedia = async (
     })
 
     const data = await response.json()
+    console.log("[uploadWhatsAppMedia] WA response status=%d body=%s", response.status, JSON.stringify(data))
+
     if (!response.ok) {
         throw new Error(`Error subiendo media a WhatsApp: ${JSON.stringify(data)}`)
     }
@@ -79,6 +83,8 @@ export const sendWhatsAppAudio = async (
         audio: { id: mediaId },
     }
 
+    console.log("[sendWhatsAppAudio] POST %s payload=%s", url, JSON.stringify(payload))
+
     const response = await fetch(url, {
         method: "POST",
         headers: {
@@ -89,6 +95,8 @@ export const sendWhatsAppAudio = async (
     })
 
     const responseData = await response.json()
+    console.log("[sendWhatsAppAudio] WA response status=%d body=%s", response.status, JSON.stringify(responseData))
+
     if (!response.ok) {
         throw new Error(`Error enviando audio: ${JSON.stringify(responseData)}`)
     }
