@@ -400,10 +400,12 @@ function ChatPanel({
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
       streamRef.current = stream
 
-      // Intentar OGG (ideal para WhatsApp), fallback a WebM
+      // Prioridad: OGG/Opus (Firefox, ideal para WhatsApp) → WebM/Opus (Chrome) → MP4 (Safari)
       const mimeType = MediaRecorder.isTypeSupported("audio/ogg;codecs=opus")
         ? "audio/ogg;codecs=opus"
-        : "audio/webm;codecs=opus"
+        : MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
+          ? "audio/webm;codecs=opus"
+          : "audio/mp4"
 
       const recorder = new MediaRecorder(stream, { mimeType })
       audioChunksRef.current = []
