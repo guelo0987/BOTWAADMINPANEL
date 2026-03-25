@@ -497,41 +497,20 @@ function ChatPanel({
     try {
       setIsSendingAudio(true)
 
-      // Chrome records audio/webm which WhatsApp rejects — convert to MP3 client-side
+      // Chrome records audio/webm which WhatsApp rejects — remux to OGG/Opus client-side
       let blobToSend = audioBlob
       let fileName = "audio.ogg"
       const blobType = audioBlob.type.split(";")[0].trim()
 
       if (blobType === "audio/webm") {
         try {
-          const lamejs = (await import("lamejs")).default
-          const arrayBuffer = await audioBlob.arrayBuffer()
-          const audioCtx = new AudioContext()
-          const decoded = await audioCtx.decodeAudioData(arrayBuffer)
-          const pcm = decoded.getChannelData(0)
-          const sampleRate = decoded.sampleRate
-
-          const samples = new Int16Array(pcm.length)
-          for (let i = 0; i < pcm.length; i++) {
-            const s = Math.max(-1, Math.min(1, pcm[i]))
-            samples[i] = s < 0 ? s * 0x8000 : s * 0x7fff
-          }
-
-          const encoder = new lamejs.Mp3Encoder(1, sampleRate, 64)
-          const chunks: Int8Array[] = []
-          for (let i = 0; i < samples.length; i += 1152) {
-            const chunk = samples.subarray(i, Math.min(i + 1152, samples.length))
-            const mp3buf = encoder.encodeBuffer(chunk)
-            if (mp3buf.length > 0) chunks.push(mp3buf)
-          }
-          const end = encoder.flush()
-          if (end.length > 0) chunks.push(end)
-
-          audioCtx.close()
-          blobToSend = new Blob(chunks, { type: "audio/mpeg" })
-          fileName = "audio.mp3"
+          const { concatChunks } = await import("opus-accumulator")
+          const webmBuffer = new Uint8Array(await audioBlob.arrayBuffer())
+          const oggBuffer = await concatChunks([webmBuffer])
+          blobToSend = new Blob([oggBuffer], { type: "audio/ogg" })
+          fileName = "audio.ogg"
         } catch (convErr) {
-          console.error("[sendVoiceMessage] WebM→MP3 conversion failed:", convErr)
+          console.error("[sendVoiceMessage] WebM→OGG remux failed:", convErr)
           throw new Error("No se pudo procesar el audio grabado")
         }
       } else if (blobType === "audio/mp4") {
