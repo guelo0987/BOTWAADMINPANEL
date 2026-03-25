@@ -3,6 +3,7 @@ import prisma from "@/lib/db"
 import { getServerUser } from "@/lib/auth-server"
 import { ConversationMemory } from "@/services/redis.service"
 import { uploadWhatsAppMedia, sendWhatsAppAudio } from "@/services/whatsapp.service"
+import { concatChunks } from "opus-accumulator"
 
 export async function POST(
     req: Request,
@@ -94,12 +95,33 @@ export async function POST(
         const buffer = Buffer.from(arrayBuffer)
         console.log("[send-audio] Buffer size=%d bytes, mimeType=%s", buffer.length, audioFile.type)
 
-        // 2) Subir audio a WhatsApp (client already sends WhatsApp-compatible format)
-        const mimeType = audioFile.type || "audio/ogg"
+        // 2) Convert WebM→OGG if needed (pure JS remux, no native binary)
+        let audioBuffer = buffer
+        let mimeType = audioFile.type || "audio/ogg"
+        const baseType = mimeType.split(";")[0].trim()
+
+        if (baseType === "audio/webm") {
+            try {
+                console.log("[send-audio] Remuxing WebM→OGG via opus-accumulator (%d bytes)", buffer.length)
+                const webmData = new Uint8Array(buffer)
+                const oggData = concatChunks([webmData])
+                audioBuffer = Buffer.from(oggData)
+                mimeType = "audio/ogg"
+                console.log("[send-audio] Remux OK: %d → %d bytes", buffer.length, audioBuffer.length)
+            } catch (remuxErr: any) {
+                console.error("[send-audio] Remux failed:", remuxErr.message)
+                return NextResponse.json(
+                    { error: "Error convirtiendo audio WebM→OGG", details: remuxErr.message },
+                    { status: 500 }
+                )
+            }
+        }
+
+        // 3) Subir audio a WhatsApp
         let mediaId: string
         try {
             console.log("[send-audio] Subiendo media a WhatsApp con mimeType=%s", mimeType)
-            mediaId = await uploadWhatsAppMedia(buffer, mimeType, credentials)
+            mediaId = await uploadWhatsAppMedia(audioBuffer, mimeType, credentials)
             console.log("[send-audio] Upload exitoso, mediaId=%s", mediaId)
         } catch (uploadError: any) {
             console.error("[send-audio] UPLOAD FALLÓ:", uploadError.message)
@@ -109,7 +131,7 @@ export async function POST(
             )
         }
 
-        // 3) Enviar mensaje de audio
+        // 4) Enviar mensaje de audio
         let whatsappResponse
         try {
             console.log("[send-audio] Enviando mensaje de audio a to=%s mediaId=%s", cleanPhone, mediaId)
@@ -131,7 +153,7 @@ export async function POST(
         const messageId = whatsappResponse.messages[0].id
         const senderName = adminName || client.business_name || "Agente"
 
-        // 4) Guardar en Redis
+        // 5) Guardar en Redis
         try {
             const memory = new ConversationMemory(clientIdNum, cleanPhone)
             await memory.setHumanHandled(true, senderName)
